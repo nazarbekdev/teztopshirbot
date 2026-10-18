@@ -10,8 +10,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton as IB, Message
 
 from .. import templates_ui, ui
-from ..details import SKIP_DETAILS, needs_details
-from ..catalog import SERVICES, STUDENT_KEYS, build_params, choice_label, money, pick
+from .. import casedata
+from ..details import SKIP_DETAILS
+from ..api import PartnerError
+from ..catalog import SERVICES, STUDENT_KEYS, build_params, choice_label, is_active, money, pick
 from ..i18n import t
 
 router = Router()
@@ -31,6 +33,8 @@ def _kb(step, lang: str, can_skip_all: bool):
         per_row = 1 if any(len(b.text) > 14 for b in buttons) else 3
         for i in range(0, len(buttons), per_row):
             rows.append(buttons[i:i + per_row])
+    if step.key == "extra_instructions":
+        rows.append([IB(text=t(lang, "btn_case"), callback_data="case:open", style="primary")])
     if step.optional:
         rows.append([IB(text=t(lang, "btn_skip"), callback_data="skip")])
         if can_skip_all:
@@ -69,7 +73,18 @@ async def _ask(target: Message, state: FSMContext, store, api, lang: str, user_i
         if step.target == "student" and (answers.get("_use_profile") or answers.get("_skip_student")):
             i += 1
             continue
-        if step.when == "details" and not needs_details(answers.get("topic", "")):
+        if not is_active(step, answers):
+            i += 1
+            continue
+        if step.kind == "plan":
+            plan = await _make_plan(target, api, lang, answers)
+            if plan:
+                await state.update_data(i=i, plan_draft=plan)
+                await _show_plan(target, plan, lang)
+                return
+            await target.answer(t(lang, "plan_failed"))
+            answers = {**answers, step.key: ""}      # worker buyurtma paytida avto-reja tuzadi
+            await state.update_data(answers=answers)
             i += 1
             continue
         if step.kind == "template":
@@ -117,6 +132,15 @@ async def on_text(message: Message, state: FSMContext, store, api, lang):
     step = SERVICES[data["slug"]].steps[data["i"]]
     if step.kind != "text":
         await message.answer(t(lang, "pick_button"))
+        return
+    if step.key == "case_data":
+        cleaned = casedata.clean(message.text)
+        if not cleaned:
+            await message.answer(t(lang, "case_invalid"), reply_markup=ui.inline(
+                [IB(text=t(lang, "btn_skip"), callback_data="skip")]))
+            return
+        await message.answer(t(lang, "case_saved"))
+        await _advance(message, state, store, api, lang, message.from_user.id, {step.key: cleaned})
         return
     text = " ".join((message.text or "").split())
     if step.when == "details" and text.lower() in SKIP_DETAILS:
@@ -222,6 +246,83 @@ async def tpl_select(callback: CallbackQuery, state: FSMContext, store, api, lan
     await _advance(callback.message, state, store, api, lang, callback.from_user.id, {step.key: template_id})
 
 
+def _plan_kb(lang: str):
+    return ui.inline([IB(text=t(lang, "btn_plan_ok"), callback_data="plan:ok", style="success")],
+                     [IB(text=t(lang, "btn_plan_regen"), callback_data="plan:regen", style="primary")],
+                     [ui.cancel_button(lang)])
+
+
+async def _make_plan(target: Message, api, lang: str, answers: dict) -> str:
+    """Hamkor API'dan avto-reja. Xato/limit bo'lsa bo'sh qator (chaqiruvchi qadamni o'tkazadi)."""
+    bobs, _, bolim = str(answers.get("plan_cfg", "2_3")).partition("_")
+    wait = await target.answer(t(lang, "plan_generating"))
+    try:
+        result = await api.create_plan({
+            "topic": answers.get("topic", ""), "subject": answers.get("subject", ""),
+            "language": answers.get("language", "uz"), "bob_count": int(bobs), "bolim_per_bob": int(bolim or 3)})
+        return result.get("plan", "")
+    except PartnerError as e:
+        logger.warning("Reja olinmadi: %s", e)
+        return ""
+    except Exception as e:
+        logger.warning("Reja olinmadi: %s", e)
+        return ""
+    finally:
+        try:
+            await wait.delete()
+        except Exception:
+            pass
+
+
+async def _show_plan(target: Message, plan: str, lang: str) -> None:
+    await target.answer(t(lang, "plan_view") + f"<pre>{html.escape(plan[:3000])}</pre>", parse_mode="HTML",
+                        reply_markup=_plan_kb(lang))
+
+
+async def _current_step(state: FSMContext):
+    data = await state.get_data()
+    return data, SERVICES[data["slug"]].steps[data["i"]]
+
+
+@router.callback_query(Flow.collecting, F.data == "plan:ok")
+async def plan_ok(callback: CallbackQuery, state: FSMContext, store, api, lang):
+    data, step = await _current_step(state)
+    if step.kind != "plan" or not data.get("plan_draft"):
+        await callback.answer(t(lang, "tpl_stale"), show_alert=True)
+        return
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await _advance(callback.message, state, store, api, lang, callback.from_user.id, {step.key: data["plan_draft"]})
+
+
+@router.callback_query(Flow.collecting, F.data == "plan:regen")
+async def plan_regen(callback: CallbackQuery, state: FSMContext, store, api, lang):
+    data, step = await _current_step(state)
+    if step.kind != "plan":
+        await callback.answer(t(lang, "tpl_stale"), show_alert=True)
+        return
+    await callback.answer()
+    plan = await _make_plan(callback.message, api, lang, data["answers"])
+    if not plan:
+        await callback.message.answer(t(lang, "plan_busy"))
+        return
+    await state.update_data(plan_draft=plan)
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await _show_plan(callback.message, plan, lang)
+
+
+@router.callback_query(Flow.collecting, F.data == "case:open")
+async def case_open(callback: CallbackQuery, state: FSMContext, store, api, lang):
+    data, step = await _current_step(state)
+    if step.key != "extra_instructions":
+        await callback.answer(t(lang, "tpl_stale"), show_alert=True)
+        return
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await _advance(callback.message, state, store, api, lang, callback.from_user.id,
+                   {"extra_instructions": "", "_case": True})
+
+
 def _summary(slug: str, answers: dict, lang: str, tpl: dict | None = None) -> str:
     lines = []
     for step in SERVICES[slug].steps:
@@ -234,7 +335,10 @@ def _summary(slug: str, answers: dict, lang: str, tpl: dict | None = None) -> st
             continue
         # Tugmadagi «15 slayd — 5 500 so'm» dan narx qismi olib tashlanadi (narx pastda alohida ko'rsatiladi)
         shown = choice_label(step, value, lang).split(" — ")[0] if step.kind == "choice" else value
-        lines.append(f"• {html.escape(pick(step.lbl, lang))}: <b>{html.escape(str(shown))}</b>")
+        shown = str(shown)
+        if step.key in ("plan", "case_data", "notes", "extra_instructions") and len(shown) > 60:
+            shown = shown.splitlines()[0][:57] + "…"
+        lines.append(f"• {html.escape(pick(step.lbl, lang))}: <b>{html.escape(shown)}</b>")
     return "\n".join(lines)
 
 

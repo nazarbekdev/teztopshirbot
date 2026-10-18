@@ -348,6 +348,28 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "btn_select": {"uz": "✅ Tanlash", "ru": "✅ Выбрать", "en": "✅ Select"},
     "tpl_stale": {"uz": "Bu tugma eskirgan", "ru": "Эта кнопка устарела", "en": "This button is out of date"},
+    # ── kurs ishi: reja va qo'shimcha talablar ───────────────────────────
+    "plan_generating": {"uz": "⏳ Reja generatsiya qilinmoqda...", "ru": "⏳ Генерирую план...", "en": "⏳ Generating plan..."},
+    "plan_view": {"uz": "📋 <b>Generatsiya qilingan reja:</b>\n\n", "ru": "📋 <b>Сгенерированный план:</b>\n\n", "en": "📋 <b>Generated plan:</b>\n\n"},
+    "btn_plan_ok": {"uz": "✅ Qabul qilaman", "ru": "✅ Принимаю", "en": "✅ Accept"},
+    "btn_plan_regen": {"uz": "🔄 Qayta generatsiya", "ru": "🔄 Перегенерировать", "en": "🔄 Regenerate"},
+    "plan_failed": {
+        "uz": "⚠️ Rejani hozir ko'rsatib bo'lmadi. Buyurtma paytida u avtomatik tuziladi.",
+        "ru": "⚠️ Сейчас не удалось показать план. Он будет составлен автоматически при выполнении заказа.",
+        "en": "⚠️ Couldn't show the plan right now. It will be created automatically when the order is prepared.",
+    },
+    "plan_busy": {
+        "uz": "⏳ So'rovlar ko'p, birozdan so'ng «Qayta generatsiya» ni bosing.",
+        "ru": "⏳ Слишком много запросов, нажмите «Перегенерировать» чуть позже.",
+        "en": "⏳ Too many requests — press “Regenerate” in a moment.",
+    },
+    "btn_case": {"uz": "📊 Korxona ma'lumotini kiritish", "ru": "📊 Ввести данные предприятия", "en": "📊 Enter company data"},
+    "case_invalid": {
+        "uz": "❗ Raqamlar topilmadi. Korxona nomi va kamida bitta yil uchun raqamlarni yuboring yoki «O'tkazib yuborish»ni bosing.",
+        "ru": "❗ Цифры не найдены. Пришлите название предприятия и цифры хотя бы за один год или нажмите «Пропустить».",
+        "en": "❗ No figures found. Send the company name and figures for at least one year, or press “Skip”.",
+    },
+    "case_saved": {"uz": "✅ Korxona ma'lumoti qabul qilindi.", "ru": "✅ Данные предприятия приняты.", "en": "✅ Company data received."},
     # ── buyurtmalar ──────────────────────────────────────────────────────
     "no_orders": {"uz": "Hali buyurtmangiz yo'q. Menyudan xizmatni tanlang 👇", "ru": "У вас ещё нет заказов. Выберите услугу в меню 👇", "en": "You have no orders yet. Choose a service from the menu 👇"},
     "orders_title": {"uz": "📦 <b>So'nggi buyurtmalaringiz</b>\n", "ru": "📦 <b>Ваши последние заказы</b>\n", "en": "📦 <b>Your recent orders</b>\n"},

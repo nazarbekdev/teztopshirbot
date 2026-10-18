@@ -66,6 +66,8 @@ class FakeApi:
         self.remote = {"result": {"files": [{"id": "fil_1", "name": "a.docx"}]}}
         self.expired = False
         self.templates_fail = False
+        self.plan_fail = False
+        self.plan_calls = []
         self.template_calls = []
         self.preview_calls = []
 
@@ -80,6 +82,14 @@ class FakeApi:
             {"id": tid, "name": {"uz": f"{tid} uz", "ru": f"{tid} ru", "en": f"{tid} en"},
              "direction": meta.get(d), "slides": [10, 15, 20, 25, 30], "preview_url": f"https://x/{tid}"}
             for tid, d in order]}
+
+    async def create_plan(self, params):
+        self.plan_calls.append(params)
+        if self.plan_fail:
+            raise PartnerError(502, "generation_failed")
+        n = len(self.plan_calls)
+        return {"object": "plan", "plan": f"1-bob. Nazariy asoslar v{n}\n1.1 Tushuncha\n2-bob. Tahlil", **{
+            k: params[k] for k in ("bob_count", "bolim_per_bob")}}
 
     async def template_preview(self, template_id):
         self.preview_calls.append(template_id)
@@ -196,6 +206,18 @@ async def test_taqdimot_toliq_oqim(env):
     assert await env.store.balance(5) == 4_500
 
 
+async def kurs_tail(env, pages):
+    """Reja (avto) → qo'shimcha talab (o'tkazish) → diagramma/rasm/snoska → hajm."""
+    await env.press("c:auto")
+    await env.press("c:2_3")
+    await env.press("plan:ok")
+    await env.press("skip")
+    await env.press("c:yes")
+    await env.press("c:no")
+    await env.press("c:yes")
+    await env.press(f"c:{pages}")
+
+
 async def test_kurs_ishi_pogona_narxi_va_titul_saqlanadi(env):
     await env.store.credit(5, 200_000, "topup")
     await env.say("📖 Kurs ishi")
@@ -204,7 +226,7 @@ async def test_kurs_ishi_pogona_narxi_va_titul_saqlanadi(env):
     await env.press("skipall")                    # qolgan titul maydonlari
     await env.say("Menejment")
     await env.say("Korxonada boshqaruv tizimi")
-    await env.press("c:40-50")
+    await kurs_tail(env, "40-50")
     assert "75 000" in env.last()
     await env.press("ok")
     row = (await env.store.orders_by_status("queued"))[0]
@@ -221,7 +243,7 @@ async def test_kurs_ishi_pogona_narxi_va_titul_saqlanadi(env):
     assert "Fan" in env.last() or "fan" in env.last().lower()
     await env.say("Marketing")
     await env.say("Raqamli marketing strategiyasi")
-    await env.press("c:20-30")
+    await kurs_tail(env, "20-30")
     assert "55 000" in env.last() and "Ali Valiyev" in env.last()
 
 

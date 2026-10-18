@@ -58,6 +58,14 @@ Shablonlar va rasmlar hamkor API'dan (`GET /templates?subject=&topic=`, `/templa
 shablonlari birinchi turadi. Rasm Telegram'ga bir marta yuklanadi va `file_id` bazada (`tpl_files`) saqlanadi.
 API javob bermasa shablon qadami o'tkaziladi va hamkor standart shablonni qo'llaydi. «O'z joyi» qoidasi `app/details.py`.
 
+## Kurs ishi oqimi
+
+Asosiy botdagi tartibda: hujjat tili (**7 til**: uz, ru, en, kz, tr, tj, kaa) → saqlangan titul ma'lumotlari yoki 8 ta titul maydoni →
+fan → mavzu → **reja** (tayyor rejam bor / avtomatik) → avtomatik bo'lsa bob/bo'lim soni va **rejani ko'rib qabul qilish yoki
+qayta generatsiya** (`POST /v1/plans`, pul yechilmaydi) → qo'shimcha talablar (yoki «🏢 haqiqiy korxona ma'lumoti») →
+grafik / rasm / snoska (ha-yo'q) → hajm (20–30 / 30–40 / 40–50 bet, 55 / 65 / 75 ming). Reja ko'rsatilmasa (API xatosi),
+qadam o'tkaziladi va reja buyurtma paytida avtomatik tuziladi. Namuna DOCX orqali shablon (F8) va bepul namuna bu botda yo'q.
+
 ## Admin: chek tasdiqlash
 
 Karta to'lovi kartasida uchta tugma: **Tasdiqlash**, **Rad etish**, **Summani tahrirlash** (mijoz noto'g'ri

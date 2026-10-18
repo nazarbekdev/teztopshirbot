@@ -42,7 +42,7 @@ class Step:
     hi: int = 300
     target: str = "params"                     # params | student
     numeric: bool = False                      # choice qiymati songa aylanadi
-    when: str = ""                             # shartli qadam: "details" — mavzu o'z joyi haqida bo'lsagina so'raladi
+    when: str = ""                             # shartli qadam (qarang `is_active`): details | plan_auto | plan_manual | case
 
 
 @dataclass(frozen=True)
@@ -73,6 +73,28 @@ class Service:
 
 def _d(uz, ru, en) -> dict:
     return {"uz": uz, "ru": ru, "en": en}
+
+
+def is_active(step: "Step", answers: dict) -> bool:
+    """
+    Shartli qadam hozir so'ralishi kerakmi.
+      details      mavzu talabaning o'z joyi haqida (aniqlashtiruvchi savol)
+      plan_auto    reja avtomatik tuzilsin deb tanlangan
+      plan_manual  o'z rejasini yozmoqchi
+      case         «korxona ma'lumotini kiritish» tugmasi bosilgan
+    """
+    when = step.when
+    if not when:
+        return True
+    if when == "details":
+        return needs_details(answers.get("topic", ""))
+    if when == "plan_auto":
+        return answers.get("plan_mode") == "auto"
+    if when == "plan_manual":
+        return answers.get("plan_mode") == "manual"
+    if when == "case":
+        return bool(answers.get("_case"))
+    raise ValueError(f"noma'lum shart: {when}")
 
 
 def choice_label(step: Step, value, lang: str) -> str:
@@ -142,6 +164,93 @@ SUPERVISOR = _student("supervisor", "🧑‍🏫 <b>Ilmiy rahbar</b>:", "🧑‍
                       ("Ilmiy rahbar", "Руководитель", "Supervisor"))
 CITY = _student("city", "🏙 <b>Shahar</b>:", "🏙 <b>Город</b>:", "🏙 <b>City</b>:", ("Shahar", "Город", "City"))
 
+KURS_LANGS = (("uz", "🇺🇿 O'zbek"), ("ru", "🇷🇺 Русский"), ("en", "🇬🇧 English"), ("kz", "🇰🇿 Қазақша"),
+              ("tr", "🇹🇷 Türkçe"), ("tj", "🇹🇯 Тоҷикӣ"), ("kaa", "🏳 Qaraqalpaq"))
+KURS_LANG_STEP = Step("language", LANG_STEP.p, LANG_STEP.lbl, kind="choice", choices=KURS_LANGS)
+
+TOPIC_KURS = Step(
+    "topic",
+    _d("Kurs ishi mavzusini to'liq yozing (kamida 10 belgi):", "Введите полную тему курсовой работы (минимум 10 символов):",
+       "Enter the full topic of the coursework (at least 10 characters):"),
+    _d("Mavzu", "Тема", "Topic"), lo=10, hi=300,
+)
+SUBJECT_KURS = Step(
+    "subject",
+    _d("Kurs ishi bajariladigan fan nomini yozing:", "Введите название предмета для курсовой работы:", "Enter the subject name for the coursework:"),
+    _d("Fan", "Предмет", "Subject"), lo=4, hi=100,
+)
+PLAN_MODE = Step(
+    "plan_mode",
+    _d("📋 Kurs ishi rejasi qanday bo'lsin?", "📋 Каким будет план курсовой работы?", "📋 How would you like the coursework plan?"),
+    _d("Reja", "План", "Plan"), kind="choice",
+    choices=(("manual", _d("📝 Tayyor rejam bor", "📝 У меня готовый план", "📝 I have a ready plan")),
+             ("auto", _d("🤖 Avtomatik generatsiya", "🤖 Автогенерация плана", "🤖 Auto-generate plan"))),
+)
+PLAN_CFG = Step(
+    "plan_cfg",
+    _d("Bob va bo'lim sonini tanlang:", "Выберите количество глав и разделов:", "Select the number of chapters and sections:"),
+    _d("Tuzilma", "Структура", "Structure"), kind="choice", when="plan_auto",
+    choices=tuple((v, _d(f"{v[0]} bob / {v[2]} bo'lim", f"{v[0]} гл. / {v[2]} разд.", f"{v[0]} ch. / {v[2]} sec."))
+                  for v in ("2_2", "2_3", "3_2", "3_3")),
+)
+PLAN_PREVIEW = Step("plan", _d("", "", ""), _d("Reja", "План", "Plan"), kind="plan", when="plan_auto", hi=4000)
+PLAN_TEXT = Step(
+    "plan",
+    _d("📝 Kurs ishi rejangizni yuboring.\n\nNamuna:\n<code>1-bob. Nazariy asoslar\n1.1 Tushuncha va ta'riflar\n1.2 Tarixiy rivojlanish\n"
+       "2-bob. Tahlil\n2.1 Holat tahlili\n2.2 Muammolar</code>",
+       "📝 Отправьте план вашей курсовой работы.\n\nПример:\n<code>Глава 1. Теоретические основы\n1.1 Понятия и определения\n"
+       "1.2 История развития\nГлава 2. Анализ\n2.1 Анализ состояния\n2.2 Проблемы</code>",
+       "📝 Send your coursework plan.\n\nExample:\n<code>Chapter 1. Theoretical foundations\n1.1 Concepts and definitions\n"
+       "1.2 Historical development\nChapter 2. Analysis\n2.1 State analysis\n2.2 Problems</code>"),
+    _d("Reja", "План", "Plan"), when="plan_manual", lo=10, hi=4000,
+)
+EXTRA = Step(
+    "extra_instructions",
+    _d("📝 Qo'shimcha talablaringiz bormi?\n\n<i>Masalan: \"statistik jadvallar ko'proq bo'lsin\", \"O'zbekiston tajribasiga e'tibor bering\", "
+       "\"kod bloklari Python da bo'lsin\"</i>",
+       "📝 Есть ли дополнительные требования?\n\n<i>Например: «добавьте больше таблиц», «акцент на опыте Узбекистана», «код на Python»</i>",
+       "📝 Any additional requirements?\n\n<i>E.g.: \"add more tables\", \"focus on Uzbekistan's experience\", \"code blocks in Python\"</i>"),
+    _d("Qo'shimcha talablar", "Доп. требования", "Extra requirements"), optional=True, hi=1000,
+)
+CASE_DATA = Step(
+    "case_data",
+    _d("📊 <b>Amaliy qism uchun HAQIQIY korxona ma'lumoti</b>\n\nKorxona nomi va yillar bo'yicha raqamlarni yuboring. Masalan:\n"
+       "<i>Korxona: «Toshkent Tekstil» MChJ\n2022: tushum 120 mln, debitorlik 18 mln, kreditorlik 14 mln\n2023: tushum 150 mln, debitorlik 27 mln, "
+       "kreditorlik 16 mln</i>\n\nAmaliy bobdagi barcha raqamlar FAQAT shu ma'lumotdan (va undan hisoblangan ko'rsatkichlardan) olinadi — hech narsa "
+       "to'qilmaydi. Yubormasangiz, amaliy qism ochiq <b>«shartli misol»</b> sifatida yoziladi.",
+       "📊 <b>РЕАЛЬНЫЕ данные предприятия для практической части</b>\n\nПришлите название предприятия и цифры по годам. Например:\n"
+       "<i>Компания: ООО «Ташкент Текстиль»\n2022: выручка 120 млн, дебиторская 18 млн, кредиторская 14 млн\n2023: выручка 150 млн, "
+       "дебиторская 27 млн, кредиторская 16 млн</i>\n\nВсе цифры практической главы берутся ТОЛЬКО из этих данных (и показателей, рассчитанных "
+       "по ним) — ничего не выдумывается. Если не пришлёте, практическая часть будет написана как открыто <b>«условный пример»</b>.",
+       "📊 <b>REAL company data for the practical part</b>\n\nSend the company name and figures by year. For example:\n"
+       "<i>Company: Tashkent Textile LLC\n2022: revenue 120m, receivables 18m, payables 14m\n2023: revenue 150m, receivables 27m, payables 16m</i>\n\n"
+       "Every figure in the practical chapter comes ONLY from this data (and ratios computed from it) — nothing is invented. If you skip it, the "
+       "practical part is written as an openly <b>\"conditional example\"</b>."),
+    _d("Korxona ma'lumoti", "Данные предприятия", "Company data"), optional=True, hi=4000, when="case",
+)
+YES_NO = (("yes", _d("✅ Ha", "✅ Да", "✅ Yes")), ("no", _d("❌ Yo'q", "❌ Нет", "❌ No")))
+HAS_DIAGRAMS = Step(
+    "has_diagrams",
+    _d("📊 Kurs ishida grafik va diagrammalar bo'lsinmi?\n\n<i>Ha — jadvallar, bar diagrammalar, grafiklar qo'shiladi\nYo'q — faqat matn</i>",
+       "📊 Включить графики и диаграммы в курсовую?\n\n<i>Да — таблицы, bar-диаграммы, графики\nНет — только текст</i>",
+       "📊 Include charts and diagrams in the coursework?\n\n<i>Yes — tables, bar charts, graphs\nNo — text only</i>"),
+    _d("Grafik va diagrammalar", "Графики и диаграммы", "Charts and diagrams"), kind="choice", choices=YES_NO,
+)
+HAS_IMAGES = Step(
+    "has_images",
+    _d("🖼 Rasm (sxema) joylashtirilsinmi?\n\n<i>Ha — jarayon sxemalari va tuzilma rasmlari izoh va tahlil bilan qo'shiladi\nYo'q — rasmsiz</i>",
+       "🖼 Вставлять рисунки (схемы)?\n\n<i>Да — схемы процессов и структур с подписью и анализом\nНет — без рисунков</i>",
+       "🖼 Include figures (schemes)?\n\n<i>Yes — process and structure diagrams with captions and analysis\nNo — without figures</i>"),
+    _d("Rasmlar (sxema)", "Рисунки (схемы)", "Figures"), kind="choice", choices=YES_NO,
+)
+HAS_FOOTNOTES = Step(
+    "has_footnotes",
+    _d("📎 Snoskalar (izohlar) kerakmi?\n\n<i>Ha — ilmiy snoskalar qo'shiladi\nYo'q — faqat matn</i>",
+       "📎 Нужны ли сноски (ссылки)?\n\n<i>Да — научные сноски\nНет — только текст</i>",
+       "📎 Should footnotes be included?\n\n<i>Yes — academic footnotes\nNo — text only</i>"),
+    _d("Snoskalar", "Сноски", "Footnotes"), kind="choice", choices=YES_NO,
+)
+
 # Kurs ishi pog'onalari: narx bet oralig'iga qarab
 KURS_PRICES = {"20-30": 55_000, "30-40": 65_000, "40-50": 75_000}
 
@@ -206,8 +315,9 @@ SERVICES: dict[str, Service] = {
         "kurs_ishi", "📖", _d("Kurs ishi", "Курсовая работа", "Coursework"),
         _d("DOCX, 20–50 bet", "DOCX, 20–50 стр.", "DOCX, 20–50 pages"),
         _d("5–15 daqiqa", "5–15 минут", "5–15 minutes"),
-        (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, KAFEDRA, DIRECTION, GROUP, SUPERVISOR, CITY,
-         SUBJECT, TOPIC, _kurs_pages()),
+        (KURS_LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, KAFEDRA, DIRECTION, GROUP, SUPERVISOR, CITY,
+         SUBJECT_KURS, TOPIC_KURS, PLAN_MODE, PLAN_CFG, PLAN_PREVIEW, PLAN_TEXT, EXTRA, CASE_DATA,
+         HAS_DIAGRAMS, HAS_IMAGES, HAS_FOOTNOTES, _kurs_pages()),
         KURS_PRICES, profile=True,
     ),
     "mustaqil_ish": Service(
@@ -259,7 +369,7 @@ def build_params(service: Service, answers: dict) -> dict:
     for step in service.steps:
         if step.kind == "profile":
             continue
-        if step.when == "details" and not needs_details(answers.get("topic", "")):
+        if not is_active(step, answers):
             continue                                   # shartli qadam so'ralmagan — eski javob ham ketmaydi
         value = answers.get(step.key)
         if value in (None, ""):
@@ -267,6 +377,15 @@ def build_params(service: Service, answers: dict) -> dict:
         (student if step.target == "student" else params)[step.key] = value
     if student:
         params["student"] = student
+    if service.slug == "kurs_ishi":
+        for key in ("plan_mode", "plan_cfg"):
+            params.pop(key, None)
+        if answers.get("plan_mode") == "auto" and answers.get("plan_cfg"):
+            bobs, _, bolim = str(answers["plan_cfg"]).partition("_")
+            params["bob_count"], params["bolim_per_bob"] = int(bobs), int(bolim)
+        for key in ("has_diagrams", "has_images", "has_footnotes"):
+            if key in answers:
+                params[key] = answers[key] == "yes"        # tugmadagi yes/no → mantiqiy qiymat
     if service.slug == "krossvord" and params.get("subject"):
         # Hamkor API'da krossvord uchun `subject` yo'q: fan mavzuga qo'shiladi
         params["topic"] = f"{params['topic']} ({params['subject']})"

@@ -98,7 +98,8 @@ async def test_kurs_ishi_promokodga_kirmaydi(env):
     await env.press("skipall")
     await env.say("Menejment")
     await env.say("Boshqaruv tizimi mavzusi")
-    await env.press("c:20-30")
+    from tests.test_flow import kurs_tail
+    await kurs_tail(env, "20-30")
     assert "bepul" not in env.last().lower() and "free" not in env.last().lower()
     assert "55 000" in env.last()
 

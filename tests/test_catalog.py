@@ -53,7 +53,8 @@ def test_savollar_tartibi_asosiy_bot_bilan_bir_xil():
     assert keys("test") == ["language", "subject", "topic", "questions"]
     assert keys("krossvord") == ["language", "subject", "topic", "word_count"]
     assert keys("mustaqil_ish") == ["language", "subject", "topic", "pages"]
-    assert keys("kurs_ishi") == ["language", "subject", "topic", "pages"]
+    assert keys("kurs_ishi") == ["language", "subject", "topic", "plan_mode", "plan_cfg", "plan", "plan", "extra_instructions",
+                                 "case_data", "has_diagrams", "has_images", "has_footnotes", "pages"]
 
 
 def test_student_alohida_obyekt_va_bosh_maydon_tushadi():

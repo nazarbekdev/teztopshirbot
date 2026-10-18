@@ -67,6 +67,11 @@ class PartnerClient:
         data = (await self._request("GET", "/credits", retries=2)).json()
         return {b["service"]: b for b in data.get("balances", [])}
 
+    async def create_plan(self, params: dict) -> dict:
+        """Kurs ishi avto-rejasi (buyurtmadan oldin ko'rish). LLM chaqiruvi — uzoqroq kutiladi, qayta urinish yo'q."""
+        response = await self._request("POST", "/plans", json={"params": params}, timeout=httpx.Timeout(90.0, connect=10.0))
+        return response.json()
+
     async def templates(self, subject: str = "", topic: str = "") -> dict:
         """Taqdimot shablonlari (70 ta); fan/mavzu berilsa soha shabloni birinchi turadi."""
         params = {k: v for k, v in (("subject", subject), ("topic", topic)) if v}
