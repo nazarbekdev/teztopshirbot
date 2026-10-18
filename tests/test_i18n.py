@@ -38,7 +38,7 @@ def test_maxfiylik_matni_haqiqatga_mos_iboralarni_saqlaydi():
     """Matnda bo'lmasligi kerak bo'lgan va'dalar (kafolat) yo'q, bo'lishi shart bo'lganlar bor."""
     for lang in LANGS:
         text = TEXTS["consent_full"][lang].lower()
-        assert "7" in text                      # hamkorda fayl 7 kun saqlanadi
+        assert "osontopshir" not in text and "partner" not in text and "партн" not in text   # ichki tuzilma oshkor qilinmaydi
         assert "{contact}" in TEXTS["consent_full"][lang]
     uz = TEXTS["consent_full"]["uz"].lower()
     assert "kafolatlanmaydi" in uz
