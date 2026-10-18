@@ -48,6 +48,19 @@ Karta to'lovi kartasida uchta tugma: **Tasdiqlash**, **Rad etish**, **Summani ta
 summa yozgan bo'lsa admin chekdagi haqiqiy summani kiritadi; balansga o'sha summa tushadi, mijozga farq
 tushuntiriladi, asl summa `payments.original_amount` da qoladi).
 
+## Web admin panel
+
+Bot bilan bir jarayonda (aiohttp), `PANEL_HOST:PANEL_PORT` (standart `127.0.0.1:8082`) da ishlaydi; internetga
+nginx + HTTPS orqali chiqariladi (`PANEL_URL=https://...` bo'lsa cookie `Secure` bo'ladi). `ADMIN_IDS` bo'sh bo'lsa panel yoqilmaydi.
+
+- **Kirish parolsiz — Telegram orqali:** `/login` → «Telegram'da tasdiqlash» → botda IP va brauzer ko'rsatiladi → **Ruxsat**.
+  Sessiyani faqat so'rovni boshlagan brauzer oladi (cookie'dagi sir), token bazada xesh, 12 soat, POST'lar CSRF bilan,
+  kirish urinishlari cheklangan (`app/panel/auth.py`).
+- **Sahifalar:** bosh sahifa (statistika, hamkor kreditlari va marja), buyurtmalar (filtr, tafsilot, pulni qaytarish),
+  foydalanuvchilar (qidiruv, balansni qo'lda o'zgartirish — sabab majburiy), to'lovlar (chek rasmi, tasdiqlash / rad /
+  summani tahrirlash), audit jurnali.
+- Pul amallari botdagi bilan **bir xil yo'l**: `app/payments.py` va `Store` (qayta bosishdan himoyalangan), har biri `admin_audit` ga yoziladi.
+
 ## Ishonchlilik qoidalari
 
 - Pul buyurtma yaratilganda yechiladi, xato/bekor bo'lsa **bir marta** qaytadi (`refunded` bayrog'i).

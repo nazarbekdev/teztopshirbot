@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 FREE_COMMANDS = ("/start", "/privacy")
 FREE_CALLBACKS = ("lang:", "consent:")
-ADMIN_CALLBACKS = ("pa:", "pr:", "pe:")
+ADMIN_CALLBACKS = ("pa:", "pr:", "pe:", "al:")
 
 
 class Onboarding(BaseMiddleware):

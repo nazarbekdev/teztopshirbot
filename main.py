@@ -13,7 +13,8 @@ from app.api import PartnerClient
 from app.click_server import make_app
 from app.db import Store
 from app.fsm_storage import SqliteStorage
-from app.handlers import admin, balance, order, orders, start
+from app.handlers import admin, balance, order, orders, panel_login, start
+from app.panel.routes import make_app as make_panel
 from app.middleware import Onboarding
 from app.worker import Worker
 
@@ -57,7 +58,8 @@ async def main() -> None:
     dp.workflow_data.update(store=store, settings=settings, api=api, notify_admins=notify_admins)
     dp.message.outer_middleware(Onboarding())
     dp.callback_query.outer_middleware(Onboarding())
-    for module in (start, order, orders, balance, admin):
+    # panel_login `start` dan OLDIN: `/start alogin_...` umumiy /start ga tushib ketmasin
+    for module in (panel_login, start, order, orders, balance, admin):
         dp.include_router(module.router)
 
     worker = Worker(store, api, bot, settings.max_active, alert)
@@ -72,6 +74,14 @@ async def main() -> None:
     else:
         logger.info("Click sozlanmagan — faqat karta orqali to'lov")
 
+    panel_runner = None
+    if settings.admin_ids:
+        username = (await bot.get_me()).username
+        panel_runner = web.AppRunner(make_panel(store, settings, bot, api, username))
+        await panel_runner.setup()
+        await web.TCPSite(panel_runner, settings.panel_host, settings.panel_port).start()
+        logger.info("Admin panel: http://%s:%s", settings.panel_host, settings.panel_port)
+
     logger.info("Ishga tushdi (API rejimi: %s)", "TEST" if settings.test_mode else "LIVE")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
@@ -80,6 +90,8 @@ async def main() -> None:
             t.cancel()
         if runner:
             await runner.cleanup()
+        if panel_runner:
+            await panel_runner.cleanup()
         await api.close()
         await store.close()
         await bot.session.close()

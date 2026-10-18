@@ -1,0 +1,9 @@
+<div class="scroll"><table>
+<tr><th>#</th><th>Vaqt</th><th>Foydalanuvchi</th><th>Xizmat</th><th>Holat</th><th class="num">Narx</th></tr>
+{% for o in orders %}<tr>
+<td><a href="/orders/{{ o.id }}">#{{ o.id }}</a></td><td class="mute">{{ o.created_at|dt }}</td>
+<td><a href="/users/{{ o.tg_id }}">{{ o.tg_id }}</a></td><td>{{ o.service }}</td>
+<td><span class="badge b-{{ o.status }}">{{ o.status }}</span>{% if o.refunded %} <span class="mute">↩ qaytarilgan</span>{% endif %}</td>
+<td class="num">{{ o.price|money }}</td></tr>
+{% else %}<tr><td colspan="6" class="mute">Buyurtma yo'q</td></tr>{% endfor %}
+</table></div>

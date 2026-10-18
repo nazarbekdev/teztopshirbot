@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Foydalanuvchilar{% endblock %}
+{% block body %}
+<h1>Foydalanuvchilar</h1>
+<form method="get" class="row card"><input name="q" value="{{ q }}" placeholder="ID, ism yoki @username" size="30"><button>Qidirish</button></form>
+<div class="scroll"><table>
+<tr><th>ID</th><th>Ism</th><th>Til</th><th>Rozilik</th><th class="num">Balans</th><th>Oxirgi faollik</th></tr>
+{% for u in users %}<tr><td><a href="/users/{{ u.tg_id }}">{{ u.tg_id }}</a></td>
+<td>{{ u.name }}{% if u.username %} <span class="mute">@{{ u.username }}</span>{% endif %}</td>
+<td>{{ u.lang or '—' }}</td><td>{{ '✅' if u.consent_version else '—' }}</td>
+<td class="num">{{ u.balance|money }}</td><td class="mute">{{ u.last_seen|dt }}</td></tr>
+{% else %}<tr><td colspan="6" class="mute">Topilmadi</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton as IB, Message
 
-from .. import ui
+from .. import payments, ui
 from ..catalog import money
 from ..i18n import t
 
@@ -150,29 +150,21 @@ async def admin_decision(callback: CallbackQuery, store, settings):
         await callback.answer("Ruxsat yo'q", show_alert=True)
         return
     action, raw = callback.data.split(":")
-    pid, approve = int(raw), action == "pa"
-    payment = await store.settle_payment(pid, "pending", "approved" if approve else "rejected",
-                                         admin_id=callback.from_user.id)
+    pid = int(raw)
+    approve = action == "pa"
+    decide = payments.approve if approve else payments.reject
+    payment = await decide(store, callback.bot, pid, callback.from_user.id)
     if payment is None:
         await callback.answer("Bu to'lov allaqachon ko'rib chiqilgan", show_alert=True)
         return
+    await store.audit(callback.from_user.id, "payment_approve" if approve else "payment_reject",
+                      f"#{pid} {payment['amount']} (bot)")
     user = await store.user(payment["tg_id"])
-    ulang = user.get("lang") or "uz"
-    if approve:
-        await store.credit(payment["tg_id"], payment["amount"], "card_topup", f"payment:{pid}")
-        orig = payment.get("original_amount")
-        text = (t(ulang, "pay_approved_edited", asked=money(orig, ulang), amount=money(payment["amount"], ulang))
-                if orig and orig != payment["amount"] else t(ulang, "pay_approved", amount=money(payment["amount"], ulang)))
-        mark = f"✅ Tasdiqlandi ({callback.from_user.full_name}): {money(payment['amount'])}"
-    else:
-        text, mark = t(ulang, "pay_rejected"), f"❌ Rad etildi ({callback.from_user.full_name})"
+    mark = (f"✅ Tasdiqlandi ({callback.from_user.full_name}): {money(payment['amount'])}" if approve
+            else f"❌ Rad etildi ({callback.from_user.full_name})")
     await callback.answer(mark[:150])
     await callback.message.edit_caption(caption=card_caption(payment, user) + f"\n\n{mark}", parse_mode="HTML",
                                         reply_markup=None)
-    try:
-        await callback.bot.send_message(payment["tg_id"], text, parse_mode="HTML")
-    except Exception:
-        logger.warning("To'lov natijasini yuborib bo'lmadi: %s", payment["tg_id"])
 
 
 @router.callback_query(F.data.startswith("pe:"))
@@ -198,12 +190,15 @@ async def admin_edit_amount(message: Message, state: FSMContext, store, settings
         return
     digits = "".join(ch for ch in message.text if ch.isdigit())
     amount = int(digits) if digits else 0
-    if not 1_000 <= amount <= MAX_TOPUP:
-        await message.answer(f"Summa {money(1_000)} dan {money(MAX_TOPUP)} gacha bo'lishi kerak. Qayta yozing.")
+    if not payments.MIN_ADMIN_AMOUNT <= amount <= payments.MAX_AMOUNT:
+        await message.answer(f"Summa {money(payments.MIN_ADMIN_AMOUNT)} dan {money(payments.MAX_AMOUNT)} gacha "
+                             "bo'lishi kerak. Qayta yozing.")
         return
     data = await state.get_data()
     await state.clear()
-    payment = await store.edit_pending_amount(data["pid"], amount)
+    payment = await payments.edit_amount(store, data["pid"], amount)
+    if payment:
+        await store.audit(message.from_user.id, "payment_edit", f"#{data['pid']} {payment['original_amount']}→{amount} (bot)")
     if payment is None:
         await message.answer("Bu to'lov allaqachon ko'rib chiqilgan.")
         return

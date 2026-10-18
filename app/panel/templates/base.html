@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Admin{% endblock %} · TezTopshir</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#1b2430;--mute:#6b7787;--line:#e3e8f0;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--amber:#d97706}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1520;--card:#18212f;--ink:#e8edf5;--mute:#93a0b3;--line:#263247;--blue:#5b8dff;--green:#34d27b;--red:#ff6b6b;--amber:#f0a73a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav{max-width:1100px;margin:auto;display:flex;gap:4px;align-items:center;padding:8px 16px;flex-wrap:wrap}
+nav a{color:var(--ink);text-decoration:none;padding:6px 12px;border-radius:8px}nav a:hover,nav a.on{background:var(--bg);color:var(--blue)}
+nav .sp{flex:1}nav form{margin:0}
+main{max-width:1100px;margin:auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0 0 16px}h2{font-size:17px;margin:24px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat b{display:block;font-size:24px}.stat span{color:var(--mute);font-size:13px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.03em}
+tr:last-child td{border-bottom:0}.scroll{overflow-x:auto}
+a{color:var(--blue)}.mute{color:var(--mute)}.num{text-align:right;white-space:nowrap}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;background:var(--bg);border:1px solid var(--line)}
+.b-succeeded,.b-approved,.b-paid{color:var(--green)}.b-failed,.b-rejected,.b-canceled{color:var(--red)}.b-queued,.b-pending,.b-submitted,.b-processing,.b-prepared{color:var(--amber)}
+form.inline{display:inline}input,select,button{font:inherit}
+input,select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+button{padding:7px 14px;border:0;border-radius:8px;cursor:pointer;color:#fff;background:var(--blue)}
+button.g{background:var(--green)}button.r{background:var(--red)}button.x{background:var(--mute)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.flash{padding:10px 14px;border-radius:10px;margin-bottom:14px;background:var(--card);border:1px solid var(--line)}
+.flash.ok{border-color:var(--green)}.flash.err{border-color:var(--red)}
+img.rc{max-width:260px;border-radius:10px;border:1px solid var(--line)}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px;margin:0}
+</style>
+</head>
+<body>
+<header><nav>
+<strong style="margin-right:8px">⚡ TezTopshir</strong>
+<a href="/" class="{{ 'on' if active=='dash' }}">Bosh sahifa</a>
+<a href="/orders" class="{{ 'on' if active=='orders' }}">Buyurtmalar</a>
+<a href="/users" class="{{ 'on' if active=='users' }}">Foydalanuvchilar</a>
+<a href="/payments" class="{{ 'on' if active=='payments' }}">To'lovlar{% if pending %} <span class="badge b-pending">{{ pending }}</span>{% endif %}</a>
+<a href="/audit" class="{{ 'on' if active=='audit' }}">Audit</a>
+<span class="sp"></span>
+<form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="x">Chiqish</button></form>
+</nav></header>
+<main>
+{% if flash %}<div class="flash {{ flash[0] }}">{{ flash[1] }}</div>{% endif %}
+{% block body %}{% endblock %}
+</main>
+</body></html>

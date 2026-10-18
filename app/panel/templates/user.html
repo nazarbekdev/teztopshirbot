@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}{{ u.name }}{% endblock %}
+{% block body %}
+<h1>{{ u.name }} <span class="mute">{{ u.tg_id }}{% if u.username %} · @{{ u.username }}{% endif %}</span></h1>
+<div class="grid">
+<div class="card stat"><b>{{ u.balance|money }}</b><span>Balans</span></div>
+<div class="card stat"><b>{{ u.lang or '—' }}</b><span>Til</span></div>
+<div class="card stat"><b>{{ u.consent_at|dt if u.consent_at else '—' }}</b><span>Rozilik (v{{ u.consent_version or '—' }})</span></div>
+<div class="card stat"><b>{{ u.created_at|dt }}</b><span>Ro'yxatdan o'tgan</span></div>
+</div>
+<h2>Balansni qo'lda o'zgartirish</h2>
+<form method="post" action="/users/{{ u.tg_id }}/balance" class="card row"
+      onsubmit="return confirm('Balans o\'zgartiriladi. Davom etasizmi?')">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input name="amount" type="number" step="1" placeholder="+5000 yoki -2000" required>
+<input name="reason" placeholder="Sabab (majburiy)" size="34" required>
+<button class="g">Saqlash</button></form>
+<h2>Buyurtmalar</h2>{% include "_orders_table.html" %}
+<h2>Balans tarixi</h2>
+<div class="scroll"><table><tr><th>Vaqt</th><th>Sabab</th><th>Havola</th><th class="num">O'zgarish</th></tr>
+{% for l in ledger %}<tr><td class="mute">{{ l.created_at|dt }}</td><td>{{ l.reason }}</td><td class="mute">{{ l.ref }}</td>
+<td class="num {{ 'b-succeeded' if l.delta>0 else 'b-failed' }}">{{ '%+d'|format(l.delta) }}</td></tr>
+{% else %}<tr><td colspan="4" class="mute">Yozuv yo'q</td></tr>{% endfor %}</table></div>
+{% endblock %}

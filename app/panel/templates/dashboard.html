@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Bosh sahifa{% endblock %}
+{% block body %}
+<h1>Bosh sahifa</h1>
+<div class="grid">
+<div class="card stat"><b>{{ s.users }}</b><span>Foydalanuvchilar</span></div>
+<div class="card stat"><b>{{ s.orders_24h }}</b><span>24 soatda buyurtma</span></div>
+<div class="card stat"><b>{{ s.revenue_24h|money }}</b><span>24 soatda tushum</span></div>
+<div class="card stat"><b class="{{ 'b-failed' if s.failed_24h }}">{{ s.failed_24h }}</b><span>24 soatda xato</span></div>
+<div class="card stat"><b class="{{ 'b-pending' if s.pending_cards }}">{{ s.pending_cards }}</b><span>Tekshirilmagan chek</span></div>
+<div class="card stat"><b>{{ mode }}</b><span>API rejimi</span></div>
+</div>
+<h2>Hamkor kreditlari</h2>
+{% if credits_error %}<div class="flash err">Kreditlarni olib bo'lmadi: {{ credits_error }}</div>{% else %}
+<div class="scroll"><table><tr><th>Xizmat</th><th class="num">Kredit</th><th class="num">Hamkor narxi</th><th class="num">Mijoz narxi</th><th class="num">Marja</th></tr>
+{% for c in credits %}<tr><td>{{ c.emoji }} {{ c.title }}</td>
+<td class="num {{ 'b-failed' if c.credits < 5 }}">{{ c.credits }}</td>
+<td class="num">{{ c.cost|money if c.cost else '—' }}</td><td class="num">{{ c.price_label }}</td>
+<td class="num">{{ c.margin|money if c.margin is not none else '—' }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+<h2>So'nggi buyurtmalar</h2>
+{% include "_orders_table.html" %}
+{% endblock %}

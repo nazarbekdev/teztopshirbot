@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}To'lovlar{% endblock %}
+{% block body %}
+<h1>To'lovlar</h1>
+<div class="row" style="margin-bottom:14px">
+<a href="/payments?status=pending">Kutilayotgan</a> · <a href="/payments?status=">Hammasi</a></div>
+{% for p in payments %}
+<div class="card row" style="align-items:flex-start">
+{% if p.receipt_file_id %}<a href="/payments/{{ p.id }}/receipt" target="_blank"><img class="rc" src="/payments/{{ p.id }}/receipt" alt="chek"></a>{% endif %}
+<div style="flex:1;min-width:240px">
+<b>#{{ p.id }}</b> <span class="badge b-{{ p.status }}">{{ p.status }}</span> <span class="mute">{{ p.method }}</span><br>
+👤 <a href="/users/{{ p.tg_id }}">{{ p.tg_id }}</a> · {{ p.created_at|dt }}<br>
+💵 <b>{{ p.amount|money }}</b>{% if p.original_amount and p.original_amount != p.amount %} <span class="mute">(mijoz yozgan: {{ p.original_amount|money }})</span>{% endif %}
+{% if p.status == 'pending' and p.method == 'card' %}
+<div class="row" style="margin-top:10px">
+<form method="post" action="/payments/{{ p.id }}/approve" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="g">✅ Tasdiqlash</button></form>
+<form method="post" action="/payments/{{ p.id }}/reject" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="r">❌ Rad etish</button></form>
+<form method="post" action="/payments/{{ p.id }}/edit" class="inline row"><input type="hidden" name="csrf" value="{{ csrf }}">
+<input name="amount" type="number" min="1000" placeholder="Haqiqiy summa" required style="width:150px"><button>✏️ Summani tahrirlash</button></form>
+</div>{% endif %}
+</div></div>
+{% else %}<div class="card mute">To'lov yo'q</div>{% endfor %}
+{% endblock %}

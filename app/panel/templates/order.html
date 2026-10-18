@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}Buyurtma #{{ o.id }}{% endblock %}
+{% block body %}
+<h1>Buyurtma #{{ o.id }} <span class="badge b-{{ o.status }}">{{ o.status }}</span></h1>
+<div class="card">
+<table>
+<tr><th>Foydalanuvchi</th><td><a href="/users/{{ o.tg_id }}">{{ user.name }}</a> ({{ o.tg_id }}){% if user.username %} @{{ user.username }}{% endif %}</td></tr>
+<tr><th>Xizmat</th><td>{{ o.service }}</td></tr>
+<tr><th>Narx</th><td>{{ o.price|money }}{% if o.refunded %} · ↩ qaytarilgan{% endif %}</td></tr>
+<tr><th>Hamkor buyurtmasi</th><td>{{ o.partner_order_id or '—' }}</td></tr>
+<tr><th>Yaratilgan</th><td>{{ o.created_at|dt }}</td></tr>
+<tr><th>Yangilangan</th><td>{{ o.updated_at|dt }}</td></tr>
+<tr><th>Urinishlar</th><td>{{ o.attempts }}</td></tr>
+<tr><th>Yetkazilgan</th><td>{{ 'ha' if o.delivered else "yo'q" }}</td></tr>
+{% if o.error %}<tr><th>Xato</th><td class="b-failed">{{ o.error }}</td></tr>{% endif %}
+</table></div>
+<h2>Parametrlar</h2><div class="card"><pre>{{ params }}</pre></div>
+{% if can_refund %}
+<form method="post" action="/orders/{{ o.id }}/refund" onsubmit="return confirm('Pul mijoz balansiga qaytariladi. Davom etasizmi?')">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="r">↩ Pulni balansga qaytarish</button></form>
+{% endif %}
+{% endblock %}

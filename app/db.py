@@ -62,6 +62,28 @@ CREATE TABLE IF NOT EXISTS fsm (
     state TEXT,
     data TEXT NOT NULL DEFAULT '{}'
 );
+CREATE TABLE IF NOT EXISTS admin_login (
+    nonce TEXT PRIMARY KEY,
+    secret_hash TEXT NOT NULL,
+    status TEXT NOT NULL,              -- pending | approved | denied | used
+    admin_id INTEGER,
+    ip TEXT, agent TEXT,
+    created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash TEXT PRIMARY KEY,
+    admin_id INTEGER NOT NULL,
+    csrf TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT,
+    created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS alerts (
     key TEXT PRIMARY KEY,
     sent_at INTEGER NOT NULL
@@ -226,6 +248,16 @@ class Store:
         await self.credit(row["tg_id"], row["price"], "refund", f"order:{order_id}")
         return True
 
+    async def cancel_queued(self, order_id: int) -> bool:
+        """Hamkorga hali yuborilmagan buyurtmani bekor qiladi (ishchi bilan poyga: faqat 'queued' bo'lsa)."""
+        cur = await self.db.execute(
+            "UPDATE orders SET status='canceled', error='admin_canceled', updated_at=? WHERE id=? AND status='queued'",
+            (now(), order_id))
+        ok = cur.rowcount == 1
+        await cur.close()
+        await self.db.commit()
+        return ok
+
     async def orders_by_status(self, *statuses: str) -> list[dict]:
         marks = ",".join("?" * len(statuses))
         return await self._all(f"SELECT * FROM orders WHERE status IN ({marks}) ORDER BY id", statuses)
@@ -305,6 +337,86 @@ class Store:
         )
         await self.db.commit()
         return True
+
+    # ── admin panel: kirish va sessiya ───────────────────────────────────
+    async def new_login(self, nonce: str, secret_hash: str, ip: str, agent: str) -> None:
+        await self.db.execute(
+            "INSERT INTO admin_login(nonce, secret_hash, status, ip, agent, created_at) VALUES(?,?, 'pending', ?,?,?)",
+            (nonce, secret_hash, ip, agent[:200], now()))
+        await self.db.commit()
+
+    async def login(self, nonce: str) -> dict | None:
+        return await self._one("SELECT * FROM admin_login WHERE nonce=?", (nonce,))
+
+    async def move_login(self, nonce: str, from_status: str, to_status: str, admin_id: int | None = None) -> bool:
+        cur = await self.db.execute(
+            "UPDATE admin_login SET status=?, admin_id=COALESCE(?, admin_id) WHERE nonce=? AND status=?",
+            (to_status, admin_id, nonce, from_status))
+        ok = cur.rowcount == 1
+        await cur.close()
+        await self.db.commit()
+        return ok
+
+    async def create_session(self, token_hash: str, admin_id: int, csrf: str, ttl: int) -> None:
+        await self.db.execute("DELETE FROM admin_sessions WHERE expires_at<?", (now(),))
+        await self.db.execute("INSERT INTO admin_sessions(token_hash, admin_id, csrf, created_at, expires_at) VALUES(?,?,?,?,?)",
+                              (token_hash, admin_id, csrf, now(), now() + ttl))
+        await self.db.commit()
+
+    async def session(self, token_hash: str) -> dict | None:
+        return await self._one("SELECT * FROM admin_sessions WHERE token_hash=? AND expires_at>?", (token_hash, now()))
+
+    async def drop_session(self, token_hash: str) -> None:
+        await self.db.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
+        await self.db.commit()
+
+    # ── admin panel: so'rovlar ───────────────────────────────────────────
+    async def audit(self, admin_id: int, action: str, detail: str = "") -> None:
+        await self.db.execute("INSERT INTO admin_audit(admin_id, action, detail, created_at) VALUES(?,?,?,?)",
+                              (admin_id, action, detail[:500], now()))
+        await self.db.commit()
+
+    async def recent_audit(self, limit: int = 100) -> list[dict]:
+        return await self._all("SELECT * FROM admin_audit ORDER BY id DESC LIMIT ?", (limit,))
+
+    async def adjust_balance(self, tg_id: int, delta: int, reason: str) -> bool:
+        """Qo'lda to'ldirish (+) yoki ayirish (−). Ayirishda balans yetmasa False."""
+        if delta == 0 or await self.user(tg_id) is None:
+            return False
+        if delta > 0:
+            await self.credit(tg_id, delta, f"admin:{reason}"[:120])
+            return True
+        return await self.debit(tg_id, -delta, f"admin:{reason}"[:120])
+
+    async def find_orders(self, status: str = "", service: str = "", tg_id: int | None = None,
+                          limit: int = 50, offset: int = 0) -> list[dict]:
+        where, args = [], []
+        if status:
+            where.append("status=?"); args.append(status)
+        if service:
+            where.append("service=?"); args.append(service)
+        if tg_id:
+            where.append("tg_id=?"); args.append(tg_id)
+        clause = ("WHERE " + " AND ".join(where)) if where else ""
+        return await self._all(f"SELECT * FROM orders {clause} ORDER BY id DESC LIMIT ? OFFSET ?", (*args, limit, offset))
+
+    async def search_users(self, query: str = "", limit: int = 50) -> list[dict]:
+        q = query.strip().lstrip("@")
+        if not q:
+            return await self._all("SELECT * FROM users ORDER BY COALESCE(last_seen, 0) DESC LIMIT ?", (limit,))
+        if q.isdigit():
+            return await self._all("SELECT * FROM users WHERE tg_id=? OR name LIKE ? OR username LIKE ? LIMIT ?",
+                                   (int(q), f"%{q}%", f"%{q}%", limit))
+        return await self._all("SELECT * FROM users WHERE name LIKE ? OR username LIKE ? ORDER BY last_seen DESC LIMIT ?",
+                               (f"%{q}%", f"%{q}%", limit))
+
+    async def user_ledger(self, tg_id: int, limit: int = 50) -> list[dict]:
+        return await self._all("SELECT * FROM ledger WHERE tg_id=? ORDER BY id DESC LIMIT ?", (tg_id, limit))
+
+    async def list_payments(self, status: str = "", limit: int = 100) -> list[dict]:
+        if status:
+            return await self._all("SELECT * FROM payments WHERE status=? ORDER BY id DESC LIMIT ?", (status, limit))
+        return await self._all("SELECT * FROM payments ORDER BY id DESC LIMIT ?", (limit,))
 
     async def stats(self) -> dict:
         day = now() - 86400

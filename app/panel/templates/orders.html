@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Buyurtmalar{% endblock %}
+{% block body %}
+<h1>Buyurtmalar</h1>
+<form method="get" class="row card">
+<select name="status"><option value="">Barcha holatlar</option>
+{% for st in statuses %}<option value="{{ st }}" {{ 'selected' if st==f.status }}>{{ st }}</option>{% endfor %}</select>
+<select name="service"><option value="">Barcha xizmatlar</option>
+{% for sv in services %}<option value="{{ sv }}" {{ 'selected' if sv==f.service }}>{{ sv }}</option>{% endfor %}</select>
+<input name="user" placeholder="Telegram ID" value="{{ f.user }}" size="14">
+<button>Filtrlash</button></form>
+{% include "_orders_table.html" %}
+<div class="row" style="margin-top:12px">
+{% if page > 0 %}<a href="?{{ qs }}&page={{ page-1 }}">← Oldingi</a>{% endif %}
+{% if has_more %}<a href="?{{ qs }}&page={{ page+1 }}">Keyingi →</a>{% endif %}</div>
+{% endblock %}
