@@ -41,4 +41,6 @@ def test_maxfiylik_matni_haqiqatga_mos_iboralarni_saqlaydi():
         assert "osontopshir" not in text and "partner" not in text and "партн" not in text   # ichki tuzilma oshkor qilinmaydi
         assert "{contact}" in TEXTS["consent_full"][lang]
     uz = TEXTS["consent_full"]["uz"].lower()
-    assert "kafolatlanmaydi" in uz
+    assert "va'da qilinmaydi" in uz
+    for lang in LANGS:                          # qisqa ekranda kafolat haqidagi gap yo'q
+        assert "kafolat" not in TEXTS["consent_intro"][lang].lower()
