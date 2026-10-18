@@ -22,24 +22,22 @@ Ishonchlilik qoidalari:
 
 import asyncio
 import html
+import json
 import logging
+import time
 
 from aiogram.types import BufferedInputFile
 
 from .api import PartnerClient, PartnerError
-from .catalog import SERVICES
+from .catalog import SERVICES, pick
 from .db import Store, now
+from .i18n import t
 
 logger = logging.getLogger(__name__)
 
 POLL_EVERY = 10          # soniya: hamkor tavsiyasi 10 dan kam bo'lmasin
 GIVE_UP_AFTER = 30 * 60  # hamkorga yuborib bo'lmasa (5xx/tarmoq) shuncha vaqtdan so'ng pul qaytariladi
 STUCK_AFTER = 45 * 60    # shuncha vaqt "tayyorlanmoqda" bo'lsa adminga xabar
-
-DISCLAIMER = (
-    "\n\n⚠️ Hujjat sun'iy intellekt yordamida tayyorlangan. Topshirishdan oldin o'zingiz "
-    "diqqat bilan o'qib chiqing va o'quv yurtingizning qoidalariga rioya qiling."
-)
 
 
 class Worker:
@@ -49,7 +47,7 @@ class Worker:
         self.bot = bot
         self.max_active = max_active
         self.alert = alert                      # async (key, text) -> None
-        self._last_poll: dict[int, float] = {}
+        self._last_poll = 0.0
         self.poll_every = POLL_EVERY
 
     # ── aylanish ─────────────────────────────────────────────────────────
@@ -83,8 +81,6 @@ class Worker:
                 slots -= 1
 
     async def _submit(self, order: dict) -> bool:
-        import json
-
         try:
             response = await self.api.create_order(
                 order["service"], json.loads(order["params"]), f"tez-{order['id']}",
@@ -104,9 +100,7 @@ class Worker:
     async def _submit_failed(self, order: dict, e: PartnerError) -> None:
         oid = order["id"]
         if e.code == "insufficient_credits":
-            await self._fail(order, e.code,
-                             "Hozir bu xizmat vaqtincha mavjud emas. Pulingiz balansga qaytarildi, "
-                             "birozdan so'ng qayta urinib ko'ring.")
+            await self._fail(order, e.code, "fail_unavailable")
             await self.alert(f"credits:{order['service']}",
                              f"🔴 <b>Hamkor krediti tugadi: {order['service']}</b>\n"
                              f"Buyurtma #{oid} bajarilmadi (mijozga pul qaytarildi). "
@@ -114,9 +108,7 @@ class Worker:
         elif e.retryable:
             attempts = order["attempts"] + 1
             if now() - order["created_at"] > GIVE_UP_AFTER:
-                await self._fail(order, e.code,
-                                 "Xizmat hozir javob bermayapti. Pulingiz balansga qaytarildi, "
-                                 "birozdan so'ng qayta urinib ko'ring.")
+                await self._fail(order, e.code, "fail_down")
                 await self.alert("partner_down", f"🟠 Hamkor API javob bermayapti ({e.code}), "
                                                   f"buyurtma #{oid} bekor qilindi.")
             else:
@@ -125,28 +117,43 @@ class Worker:
                 logger.warning("Buyurtma #%s yuborilmadi (%s), qayta uriniladi", oid, e)
         else:
             # 400/403/409: so'rovni o'zgartirmasdan qayta yuborish foydasiz — bu bizning xatomiz
-            await self._fail(order, e.code, "Buyurtmani bajarib bo'lmadi. Pulingiz balansga qaytarildi.")
+            await self._fail(order, e.code, "fail_rejected")
             await self.alert(f"order_error:{e.code}",
                              f"🔴 Hamkor buyurtmani rad etdi: <code>{html.escape(str(e))}</code>\n"
                              f"Buyurtma #{oid} ({order['service']}). Parametr yoki sozlama xatosi bo'lishi mumkin.")
 
-    async def _fail(self, order: dict, code: str, user_text: str) -> None:
+    async def _fail(self, order: dict, code: str, text_key: str) -> None:
         await self.store.update_order(order["id"], status="failed", error=code)
         await self.store.refund_order(order["id"])
-        await self._notify(order["tg_id"], f"❌ <b>Buyurtma #{order['id']}</b>\n{user_text}")
+        await self._notify(order["tg_id"], text_key, id=order["id"])
 
     # ── holat so'rash ────────────────────────────────────────────────────
     async def poll_active(self) -> None:
-        for order in await self.store.orders_by_status("submitted", "processing"):
+        """
+        Faol buyurtmalar holati. Ro'yxat endpoint'i bitta so'rovda 100 tagacha buyurtmani
+        qaytaradi (80 ta faol buyurtmani alohida so'rash daqiqasiga ~500 so'rov bo'lardi).
+        Ro'yxatda ko'rinmagani (eski yoki ro'yxat xato bergani) alohida so'raladi.
+        """
+        if time.monotonic() - self._last_poll < self.poll_every:
+            return
+        self._last_poll = time.monotonic()
+        active = await self.store.orders_by_status("submitted", "processing")
+        if not active:
+            return
+        remote_by_id: dict[str, dict] = {}
+        try:
+            remote_by_id = {o["id"]: o for o in await self.api.list_orders()}
+        except Exception as e:
+            logger.warning("Buyurtmalar ro'yxatini olib bo'lmadi (%s) — alohida so'raladi", e)
+        for order in active:
             oid = order["id"]
-            if now() - self._last_poll.get(oid, 0) < self.poll_every:
-                continue
-            self._last_poll[oid] = now()
-            try:
-                remote = await self.api.get_order(order["partner_order_id"])
-            except PartnerError as e:
-                logger.warning("Buyurtma #%s holatini olib bo'lmadi: %s", oid, e)
-                continue
+            remote = remote_by_id.get(order["partner_order_id"])
+            if remote is None:
+                try:
+                    remote = await self.api.get_order(order["partner_order_id"])
+                except PartnerError as e:
+                    logger.warning("Buyurtma #%s holatini olib bo'lmadi: %s", oid, e)
+                    continue
             await self._apply_remote(order, remote)
 
             if now() - order["updated_at"] > STUCK_AFTER:
@@ -163,9 +170,7 @@ class Worker:
             code = (remote.get("error") or {}).get("code") or status
             await self.store.update_order(oid, status=status, error=code)
             await self.store.refund_order(oid)
-            await self._notify(order["tg_id"],
-                               f"❌ <b>Buyurtma #{oid}</b> tayyorlanmadi. Pulingiz balansga qaytarildi, "
-                               "qayta urinib ko'rishingiz mumkin.")
+            await self._notify(order["tg_id"], "fail_generation", id=oid)
             if status == "failed":
                 await self.alert(f"gen_failed:{order['service']}",
                                  f"🟠 Generatsiya xatosi: buyurtma #{oid} ({order['service']}), kod <code>{code}</code>")
@@ -183,16 +188,21 @@ class Worker:
 
     async def _deliver(self, order: dict, remote: dict) -> None:
         files = (remote.get("result") or {}).get("files") or []
+        lang = ((await self.store.user(order["tg_id"])) or {}).get("lang")
         spec = SERVICES.get(order["service"])
-        caption = (f"✅ <b>{spec.title if spec else order['service']}</b> tayyor! "
-                   f"(buyurtma #{order['id']})" + DISCLAIMER)
+        caption = (t(lang, "delivered", title=pick(spec.title, lang) if spec else order["service"], id=order["id"])
+                   + t(lang, "disclaimer"))
+        tg_files: list[str] = []
         try:
             for index, f in enumerate(files):
                 data = await self.api.download(f["id"])
-                await self.bot.send_document(
+                sent = await self.bot.send_document(
                     order["tg_id"], BufferedInputFile(data, filename=f.get("name") or f"{f['id']}.bin"),
                     caption=caption if index == 0 else None, parse_mode="HTML",
                 )
+                file_id = getattr(getattr(sent, "document", None), "file_id", None)
+                if file_id:
+                    tg_files.append(file_id)
         except PartnerError as e:
             logger.warning("Fayl yuklab olinmadi (#%s): %s", order["id"], e)
             return
@@ -203,10 +213,11 @@ class Worker:
             logger.error("Buyurtma #%s tayyor, lekin fayl yo'q", order["id"])
             await self.alert(f"nofile:{order['id']}", f"🔴 Buyurtma #{order['id']} tayyor, lekin fayl yo'q.")
             return
-        await self.store.update_order(order["id"], delivered=1)
+        await self.store.update_order(order["id"], delivered=1, tg_files=json.dumps(tg_files))
 
-    async def _notify(self, tg_id: int, text: str) -> None:
+    async def _notify(self, tg_id: int, key: str, **kw) -> None:
+        lang = ((await self.store.user(tg_id)) or {}).get("lang")
         try:
-            await self.bot.send_message(tg_id, text, parse_mode="HTML")
+            await self.bot.send_message(tg_id, t(lang, key, **kw), parse_mode="HTML")
         except Exception:
             logger.warning("Mijozga xabar yuborilmadi: %s", tg_id)

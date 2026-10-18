@@ -6,14 +6,15 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 from app import config
 from app.api import PartnerClient
 from app.click_server import make_app
 from app.db import Store
-from app.handlers import admin, balance, order, start
+from app.fsm_storage import SqliteStorage
+from app.handlers import admin, balance, order, orders, start
+from app.middleware import Onboarding
 from app.worker import Worker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
@@ -51,9 +52,12 @@ async def main() -> None:
                 logger.warning("OPS kanaliga yuborilmadi")
         await notify_admins(text)
 
-    dp = Dispatcher(storage=MemoryStorage())
+    # FSM holati bazada: bot qayta ishga tushsa foydalanuvchining savol-javobi yo'qolmaydi
+    dp = Dispatcher(storage=SqliteStorage(store))
     dp.workflow_data.update(store=store, settings=settings, api=api, notify_admins=notify_admins)
-    for module in (start, order, balance, admin):
+    dp.message.outer_middleware(Onboarding())
+    dp.callback_query.outer_middleware(Onboarding())
+    for module in (start, order, orders, balance, admin):
         dp.include_router(module.router)
 
     worker = Worker(store, api, bot, settings.max_active, alert)

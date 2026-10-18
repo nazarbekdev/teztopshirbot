@@ -30,7 +30,8 @@ class Settings:
     public_url: str = field(default_factory=lambda: os.getenv("PUBLIC_URL", "").rstrip("/"))
     db_path: str = field(default_factory=lambda: os.getenv("DB_PATH", "teztopshir.db"))
     support_username: str = field(default_factory=lambda: os.getenv("SUPPORT_USERNAME", "").lstrip("@"))
-    max_active: int = field(default_factory=lambda: int(os.getenv("MAX_ACTIVE_ORDERS", "8")))
+    max_active: int = field(default_factory=lambda: int(os.getenv("MAX_ACTIVE_ORDERS", "80")))
+    per_user_active: int = field(default_factory=lambda: int(os.getenv("PER_USER_ACTIVE", "5")))
 
     @property
     def click_enabled(self) -> bool:

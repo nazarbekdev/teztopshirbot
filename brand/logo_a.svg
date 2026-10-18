@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3FA9FF"/><stop offset="1" stop-color="#1D5BD6"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7CF0A6"/><stop offset="1" stop-color="#22B45A"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0A2A7A" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- hujjat -->
+  <g filter="url(#sh)">
+    <path d="M150 96h150l76 76v236a22 22 0 0 1-22 22H150a22 22 0 0 1-22-22V118a22 22 0 0 1 22-22z" fill="#FFFFFF"/>
+    <path d="M300 96v54a22 22 0 0 0 22 22h54z" fill="#CFE3FF"/>
+  </g>
+  <!-- matn chiziqlari -->
+  <g fill="#B9CBEA">
+    <rect x="164" y="204" width="92" height="14" rx="7"/>
+    <rect x="164" y="236" width="70" height="14" rx="7"/>
+  </g>
+  <!-- chaqmoq -->
+  <g filter="url(#sh)">
+    <path transform="translate(6 -30)" d="M300 222l-96 126h66l-30 98 118-146h-70z" fill="url(#bolt)" stroke="#FFFFFF" stroke-width="10" stroke-linejoin="round"/>
+  </g>
+</svg>

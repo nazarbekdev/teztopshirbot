@@ -148,3 +148,45 @@ async def test_yetkazish_xatosi_keyin_qayta_uriniladi(store):
     ok["send"] = True
     await w.tick()
     assert (await store.order(oid))["delivered"] == 1 and len(bot.documents) == 1
+
+
+async def test_royxat_orqali_kuzatish_va_telegram_file_id_saqlanadi(store):
+    gets = []
+
+    class Sent:
+        class document:
+            file_id = "TG_FILE_1"
+
+    class Bot(FakeBot):
+        async def send_document(self, chat_id, document, caption=None, **kw):
+            await super().send_document(chat_id, document, caption)
+            return Sent()
+
+    def handler(request: httpx.Request):
+        if request.method == "POST":
+            return httpx.Response(202, json={"id": "ord_9", "status": "queued"})
+        if request.url.path.endswith("/orders"):                      # ro'yxat endpoint'i
+            gets.append("list")
+            return httpx.Response(200, json={"data": [{"id": "ord_9", "status": "succeeded",
+                                                       "result": {"files": [{"id": "fil_9", "name": "x.docx"}]}}]})
+        gets.append("download" if "/files/" in request.url.path else "single")
+        return httpx.Response(200, content=b"DOC")
+
+    api, alerts, alert = make(handler)
+    oid = await place(store)
+    w = Worker(store, api, Bot(), 80, alert)
+    w.poll_every = 0
+    await w.tick()      # yuboradi
+    await w.tick()      # ro'yxatdan holatni o'qiydi va yetkazadi
+    order = await store.order(oid)
+    assert order["delivered"] == 1 and json.loads(order["tg_files"]) == ["TG_FILE_1"]
+    assert "list" in gets and "single" not in gets                  # alohida GET /orders/{id} kerak bo'lmadi
+
+
+async def test_xabarlar_foydalanuvchi_tilida(store):
+    await store.set_lang(1, "ru")
+    api, alerts, alert = make(lambda r: httpx.Response(402, json={"error": {"code": "insufficient_credits"}}))
+    bot = FakeBot()
+    await place(store)
+    await Worker(store, api, bot, 80, alert).tick()
+    assert "временно недоступна" in bot.messages[-1][1]

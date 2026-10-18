@@ -18,6 +18,7 @@ from decimal import Decimal, InvalidOperation
 from aiohttp import web
 
 from .catalog import money
+from .i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +99,9 @@ async def complete(request: web.Request) -> web.Response:
         return web.json_response({"error": NOT_FOUND})
     await store.credit(settled["tg_id"], settled["amount"], "click_topup", f"payment:{settled['id']}")
     try:
+        lang = ((await store.user(settled["tg_id"])) or {}).get("lang")
         await app["bot"].send_message(
-            settled["tg_id"], f"🎉 To'lov muvaffaqiyatli: <b>+{money(settled['amount'])}</b>. Balansingiz to'ldi.",
-            parse_mode="HTML")
+            settled["tg_id"], t(lang, "click_paid", amount=money(settled["amount"], lang or "uz")), parse_mode="HTML")
     except Exception:
         logger.warning("Click to'lovi xabari yuborilmadi: %s", settled["tg_id"])
     return web.json_response(reply)

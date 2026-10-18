@@ -1,50 +1,104 @@
+"""Til tanlash, shartlarga rozilik, /start, yordam."""
+
 from aiogram import F, Router
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from .. import ui
-from ..catalog import ORDER, SERVICES, money
+from ..catalog import ORDER, SERVICES, pick
+from ..i18n import LANGS, t
 
 router = Router()
 
-SUPPORT = "Savol yoki muammo bo'lsa, shu yerga yozing: {contact}"
+
+def contact_of(settings, lang: str) -> str:
+    return f"@{settings.support_username}" if settings.support_username else t(lang, "admin_word")
 
 
-def welcome(name: str) -> str:
-    lines = [f"👋 Salom, <b>{name}</b>!", "",
-             "Men kurs ishi, taqdimot, referat va boshqa hujjatlarni tez tayyorlab beraman.", "",
-             "<b>Xizmatlar va narxlar:</b>"]
-    for slug in ORDER:
-        s = SERVICES[slug]
-        lines.append(f"{s.emoji} {s.title} — <b>{money(s.price)}</b>")
-    lines += ["", "Pastdagi menyudan xizmatni tanlang 👇"]
-    return "\n".join(lines)
+def welcome_text(name: str, lang: str) -> str:
+    lines = [f"{SERVICES[s].emoji} {pick(SERVICES[s].title, lang)} — <b>{ui.price_line(s, lang)}</b>" for s in ORDER]
+    return t(lang, "welcome", name=name, services="\n".join(lines))
+
+
+async def show_menu(message: Message, user_name: str, lang: str) -> None:
+    await message.answer(welcome_text(user_name, lang), parse_mode="HTML", reply_markup=ui.main_menu(lang))
 
 
 @router.message(CommandStart())
-async def start(message: Message, state: FSMContext, store):
+async def start(message: Message, state: FSMContext, store, lang):
     await state.clear()
-    await store.touch_user(message.from_user.id, message.from_user.full_name, message.from_user.username)
-    await message.answer(welcome(message.from_user.full_name), parse_mode="HTML", reply_markup=ui.main_menu())
+    if not lang:
+        await message.answer(t(None, "lang_prompt"), reply_markup=ui.lang_keyboard())
+        return
+    user = await store.user(message.from_user.id)
+    if user.get("consent_version") != ui.CONSENT_VERSION:
+        await message.answer(t(lang, "consent_intro"), parse_mode="HTML", reply_markup=ui.consent_keyboard(lang))
+        return
+    await show_menu(message, message.from_user.full_name, lang)
+
+
+@router.message(F.text.in_(ui.LANG_TEXTS))
+async def change_lang(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(t(None, "lang_prompt"), reply_markup=ui.lang_keyboard())
+
+
+@router.callback_query(F.data.startswith("lang:"))
+async def lang_chosen(callback: CallbackQuery, state: FSMContext, store, settings):
+    code = callback.data.split(":")[1]
+    if code not in LANGS:
+        await callback.answer()
+        return
+    await state.clear()
+    await store.set_lang(callback.from_user.id, code)
+    await callback.answer(t(code, "lang_changed"))
+    await callback.message.edit_reply_markup(reply_markup=None)
+    user = await store.user(callback.from_user.id)
+    if user.get("consent_version") != ui.CONSENT_VERSION:
+        await callback.message.answer(t(code, "consent_intro"), parse_mode="HTML", reply_markup=ui.consent_keyboard(code))
+    else:
+        await show_menu(callback.message, callback.from_user.full_name, code)
+
+
+def _full_text(lang: str, settings) -> str:
+    return t(lang, "consent_full", version=ui.CONSENT_VERSION, contact=contact_of(settings, lang))
+
+
+@router.callback_query(F.data == "consent:full")
+async def consent_full(callback: CallbackQuery, store, settings):
+    lang = (await store.user(callback.from_user.id)).get("lang") or "uz"
+    await callback.answer()
+    await callback.message.answer(_full_text(lang, settings), parse_mode="HTML",
+                                  reply_markup=ui.consent_keyboard(lang, with_full=False))
+
+
+@router.callback_query(F.data == "consent:yes")
+async def consent_yes(callback: CallbackQuery, store):
+    lang = (await store.user(callback.from_user.id)).get("lang") or "uz"
+    await store.accept_consent(callback.from_user.id, ui.CONSENT_VERSION)
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await show_menu(callback.message, callback.from_user.full_name, lang)
+
+
+@router.message(Command("privacy"))
+async def privacy(message: Message, store, settings, lang):
+    lang = lang or "uz"
+    user = await store.user(message.from_user.id)
+    accepted = user.get("consent_version") == ui.CONSENT_VERSION
+    await message.answer(_full_text(lang, settings), parse_mode="HTML",
+                         reply_markup=None if accepted else ui.consent_keyboard(lang, with_full=False))
 
 
 @router.message(Command("menu"))
-async def menu(message: Message, state: FSMContext):
+async def menu(message: Message, state: FSMContext, lang):
     await state.clear()
-    await message.answer("🏠 Asosiy menyu", reply_markup=ui.main_menu())
+    await message.answer(t(lang, "menu_home"), reply_markup=ui.main_menu(lang))
 
 
-@router.message(F.text == ui.HELP)
+@router.message(F.text.in_(ui.HELP_TEXTS))
 @router.message(Command("help"))
-async def help_(message: Message, state: FSMContext, settings):
+async def help_(message: Message, state: FSMContext, settings, lang):
     await state.clear()
-    contact = f"@{settings.support_username}" if getattr(settings, "support_username", "") else "administrator"
-    await message.answer(
-        "ℹ️ <b>Yordam</b>\n\n"
-        "• Xizmatni menyudan tanlang, savollarga javob bering — qolganini o'zim bajaraman.\n"
-        "• To'lov balansdan yechiladi. Balansni <b>💰 Balans</b> orqali Click yoki karta bilan to'ldirasiz.\n"
-        "• Buyurtma xato bilan tugasa, pul balansingizga avtomatik qaytadi.\n\n"
-        + SUPPORT.format(contact=contact),
-        parse_mode="HTML",
-    )
+    await message.answer(t(lang, "help", contact=contact_of(settings, lang)), parse_mode="HTML")

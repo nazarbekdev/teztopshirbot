@@ -82,6 +82,10 @@ class PartnerClient:
     async def get_order(self, order_id: str) -> dict:
         return (await self._request("GET", f"/orders/{order_id}", retries=2)).json()
 
+    async def list_orders(self, limit: int = 100) -> list[dict]:
+        """So'nggi buyurtmalar (eng yangisi birinchi): ko'p faol buyurtmani bitta so'rov bilan kuzatish."""
+        return (await self._request("GET", "/orders", params={"limit": limit}, retries=1)).json().get("data", [])
+
     async def cancel_order(self, order_id: str) -> dict:
         return (await self._request("POST", f"/orders/{order_id}/cancel")).json()
 

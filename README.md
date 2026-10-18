@@ -33,12 +33,26 @@ referat 4 000, test 1 500, krossvord 1 000 (aniq qiymat `/admin` da, `GET /credi
 - **Click:** `.env` da `CLICK_*` va `PUBLIC_URL`. Click kabinetida Prepare/Complete manzillari:
   `{PUBLIC_URL}/click/prepare`, `{PUBLIC_URL}/click/complete`.
 
+## Til, rozilik va holat
+
+- Birinchi `/start` da til tanlanadi (uz/ru/en), keyin maxfiylik shartlariga **rozilik** (`/privacy` da to'liq matn,
+  versiya `ui.CONSENT_VERSION`). Ikkalasi bo'lmaguncha boshqa hech narsa ishlamaydi (`app/middleware.py`).
+  Matnni o'zgartirsangiz versiyani oshiring — hamma qayta rozilik beradi.
+- Matnlar `app/i18n.py` da; `tests/test_i18n.py` har kalit uch tilda va `{}` joylari mos ekanini tekshiradi.
+- FSM holati **SQLite'da** (`app/fsm_storage.py`): bot qayta ishga tushsa ham foydalanuvchi savol-javobi uzilmaydi.
+- Kurs ishi / mustaqil ish / referatda titul ma'lumotlari saqlanadi va keyingi buyurtmada taklif qilinadi.
+
+## Admin: chek tasdiqlash
+
+Karta to'lovi kartasida uchta tugma: **Tasdiqlash**, **Rad etish**, **Summani tahrirlash** (mijoz noto'g'ri
+summa yozgan bo'lsa admin chekdagi haqiqiy summani kiritadi; balansga o'sha summa tushadi, mijozga farq
+tushuntiriladi, asl summa `payments.original_amount` da qoladi).
+
 ## Ishonchlilik qoidalari
 
 - Pul buyurtma yaratilganda yechiladi, xato/bekor bo'lsa **bir marta** qaytadi (`refunded` bayrog'i).
 - Hamkorga yuborish `Idempotency-Key: tez-<id>` bilan: qayta urinishda kredit ikki marta yechilmaydi.
-- Hamkorda bir vaqtda 10 tagacha faol buyurtma mumkin — biz `MAX_ACTIVE_ORDERS` (8) dan oshirmaymiz.
+- Hamkor hisobida `max_active_orders` = 80; biz `MAX_ACTIVE_ORDERS` (80) dan oshirmaymiz, bitta foydalanuvchi `PER_USER_ACTIVE` (5) tagacha.
+- Holat bitta `GET /orders` so'rovi bilan kuzatiladi (80 ta faol buyurtmani alohida so'rash daqiqasiga ~500 so'rov bo'lardi).
 - Hamkor krediti tugasa: buyurtma bajarilmaydi, mijozga pul qaytadi, adminga ogohlantirish ketadi.
 - Fayl yetkazilmasa yo'qolmaydi — keyingi aylanishda qayta uriniladi (hamkorda 7 kun saqlanadi).
-- FSM holati xotirada (MemoryStorage): bot qayta ishga tushsa tugallanmagan savol-javoblar uziladi,
-  lekin berilgan buyurtmalar va balans bazada.

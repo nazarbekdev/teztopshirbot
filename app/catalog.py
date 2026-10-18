@@ -1,136 +1,211 @@
 """
-Xizmatlar katalogi: mijoz narxi va savollar ketma-ketligi.
+Xizmatlar katalogi: mijoz narxi va savollar ketma-ketligi (uch tilda).
 
-NARX — mijozga ko'rsatiladigan narx (so'm). Hamkor (OsonTopshir) narxi
-alohida va u `GET /credits` da keladi; bu yerdagi narx har doim undan yuqori
-bo'lishi shart (`tests/test_catalog.py` shuni tekshiradi). Narx hajmga
-QARAMAYDI — hamkor API'da ham shunday, shuning uchun hajm tepasi yopiq.
+Savollar tartibi asosiy OsonTopshir botidagi bilan bir xil: avval HUJJAT TILI, keyin
+(kurs ishi/mustaqil ish/referatda) saqlangan ma'lumotlar yoki titul ma'lumotlari, so'ng
+fan, mavzu, hajm va qo'shimcha maydonlar. Hamkor API qo'llamaydigan narsa (shablon tanlash,
+qo'lda reja) bu botda yo'q.
+
+NARX — mijoz narxi (so'm). Hamkor narxi alohida (`GET /credits`); bu yerdagi narx har doim
+undan kamida 20% yuqori (`tests/test_catalog.py`). Narx hajmga QARAMAYDI, faqat kurs ishida
+bet oralig'iga qarab 3 pog'ona.
 
 Parametr qiymatlari hamkor API qoidalariga mos (`partner-docs`):
-  kurs_ishi    pages faqat 20-30
+  kurs_ishi   pages 20-30 / 30-40 / 40-50 (katta hajm hamkorda `allow_large_pages` bilan)
   mustaqil_ish/referat   pages 10/15/20
-  taqdimot     slides 10/15/20/25/30
-  test         questions 10..30
-  krossvord    word_count 10..30
+  taqdimot    slides 10/15/20/25/30
+  test        questions 10..30
+  krossvord   word_count 10..30
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from .i18n import LANG_NAMES, pick
+
+CURRENCY = {"uz": "so'm", "ru": "сум", "en": "UZS"}
+
+
+def money(value: int, lang: str = "uz") -> str:
+    return f"{value:,}".replace(",", " ") + " " + pick(CURRENCY, lang)
 
 
 @dataclass(frozen=True)
 class Step:
-    key: str                              # params kaliti (target="student" bo'lsa student ichida)
-    prompt: str
-    kind: str = "text"                    # text | choice
-    choices: tuple[tuple[str, str], ...] = ()   # (qiymat, tugma matni)
+    key: str                                   # params kaliti (target="student" bo'lsa student ichida)
+    p: dict                                    # savol matni {uz, ru, en}
+    lbl: dict                                  # tasdiq ekranidagi nomi
+    kind: str = "text"                         # text | choice | profile
+    choices: tuple = ()                        # (qiymat, tugma matni yoki {uz,ru,en})
     optional: bool = False
     lo: int = 1
     hi: int = 300
-    target: str = "params"                # params | student
-    numeric: bool = False                 # choice qiymati songa aylanadi
-
-
-LANG = (("uz", "🇺🇿 O'zbekcha"), ("ru", "🇷🇺 Русский"), ("en", "🇬🇧 English"))
-
-
-def _nums(values) -> tuple[tuple[str, str], ...]:
-    return tuple((str(v), str(v)) for v in values)
+    target: str = "params"                     # params | student
+    numeric: bool = False                      # choice qiymati songa aylanadi
 
 
 @dataclass(frozen=True)
 class Service:
     slug: str
     emoji: str
-    title: str
-    price: int
-    eta: str
-    steps: tuple[Step, ...]
-    note: str = ""
+    title: dict
+    note: dict
+    eta: dict
+    steps: tuple
+    price: int | dict                          # int yoki {pages qiymati: narx}
+    price_key: str = "pages"
+    profile: bool = False                      # titul ma'lumotlari saqlanadi va qayta ishlatiladi
+
+    def price_for(self, answers: dict) -> int:
+        if isinstance(self.price, dict):
+            return self.price.get(answers.get(self.price_key), min(self.price.values()))
+        return self.price
+
+    @property
+    def min_price(self) -> int:
+        return min(self.price.values()) if isinstance(self.price, dict) else self.price
+
+    @property
+    def is_tiered(self) -> bool:
+        return isinstance(self.price, dict)
 
 
-_TOPIC = Step("topic", "✍️ <b>Mavzuni</b> yozing (5–300 belgi):", lo=5, hi=300)
-_SUBJECT = Step("subject", "📚 <b>Fan nomini</b> yozing (masalan: Menejment):", lo=2, hi=100)
-_LANG = Step("language", "🌐 Qaysi tilda tayyorlaymiz?", kind="choice", choices=LANG)
+def _d(uz, ru, en) -> dict:
+    return {"uz": uz, "ru": ru, "en": en}
+
+
+def choice_label(step: Step, value, lang: str) -> str:
+    for v, label in step.choices:
+        if str(v) == str(value):
+            return label if isinstance(label, str) else pick(label, lang)
+    return str(value)
+
+
+def _nums(values) -> tuple:
+    return tuple((str(v), str(v)) for v in values)
+
+
+LANG_STEP = Step(
+    "language",
+    _d("🌐 Hujjat qaysi tilda bo'lsin?", "🌐 На каком языке подготовить документ?", "🌐 Which language should the document be in?"),
+    _d("Hujjat tili", "Язык документа", "Document language"),
+    kind="choice", choices=tuple(LANG_NAMES.items()),
+)
+PROFILE_STEP = Step("_profile", _d("", "", ""), _d("", "", ""), kind="profile")
+SUBJECT = Step(
+    "subject",
+    _d("📚 <b>Fan nomi</b>ni yozing (masalan: Menejment):", "📚 Напишите <b>название предмета</b> (например: Менеджмент):",
+       "📚 Enter the <b>subject</b> (e.g. Management):"),
+    _d("Fan", "Предмет", "Subject"), lo=2, hi=100,
+)
+TOPIC = Step(
+    "topic",
+    _d("✍️ <b>Mavzu</b>ni yozing (5–300 belgi):", "✍️ Напишите <b>тему</b> (5–300 символов):", "✍️ Write the <b>topic</b> (5–300 characters):"),
+    _d("Mavzu", "Тема", "Topic"), lo=5, hi=300,
+)
+TOPIC_SHORT = Step(
+    "topic",
+    _d("✍️ <b>Mavzu</b>ni yozing (3–300 belgi):", "✍️ Напишите <b>тему</b> (3–300 символов):", "✍️ Write the <b>topic</b> (3–300 characters):"),
+    _d("Mavzu", "Тема", "Topic"), lo=3, hi=300,
+)
+
+
+def _student(key: str, uz: str, ru: str, en: str, lbl: tuple) -> Step:
+    return Step(key, _d(uz, ru, en), _d(*lbl), optional=True, hi=150, target="student")
+
+
+FULL_NAME = _student("full_name", "👤 <b>Ism-familiyangiz</b> (titul varag'i uchun):", "👤 Ваши <b>имя и фамилия</b> (для титульного листа):",
+                     "👤 Your <b>full name</b> (for the title page):", ("Ism-familiya", "Имя и фамилия", "Full name"))
+UNIVERSITY = _student("university", "🏛 <b>Universitet</b> nomi:", "🏛 Название <b>университета</b>:", "🏛 <b>University</b> name:",
+                      ("Universitet", "Университет", "University"))
+FACULTY = _student("faculty", "🏫 <b>Fakultet</b>:", "🏫 <b>Факультет</b>:", "🏫 <b>Faculty</b>:", ("Fakultet", "Факультет", "Faculty"))
+KAFEDRA = _student("kafedra", "🏢 <b>Kafedra</b>:", "🏢 <b>Кафедра</b>:", "🏢 <b>Department</b>:", ("Kafedra", "Кафедра", "Department"))
+DIRECTION = _student("direction", "🎯 <b>Ta'lim yo'nalishi</b>:", "🎯 <b>Направление обучения</b>:", "🎯 <b>Field of study</b>:",
+                     ("Yo'nalish", "Направление", "Field of study"))
+GROUP = _student("group", "👥 <b>Guruh</b>:", "👥 <b>Группа</b>:", "👥 <b>Group</b>:", ("Guruh", "Группа", "Group"))
+SUPERVISOR = _student("supervisor", "🧑‍🏫 <b>Ilmiy rahbar</b>:", "🧑‍🏫 <b>Научный руководитель</b>:", "🧑‍🏫 <b>Supervisor</b>:",
+                      ("Ilmiy rahbar", "Руководитель", "Supervisor"))
+CITY = _student("city", "🏙 <b>Shahar</b>:", "🏙 <b>Город</b>:", "🏙 <b>City</b>:", ("Shahar", "Город", "City"))
+
+# Kurs ishi pog'onalari: narx bet oralig'iga qarab
+KURS_PRICES = {"20-30": 55_000, "30-40": 65_000, "40-50": 75_000}
+
+
+def _kurs_pages() -> Step:
+    labels = tuple(
+        (rng, _d(f"{rng} bet — {money(price, 'uz')}", f"{rng} стр. — {money(price, 'ru')}", f"{rng} pages — {money(price, 'en')}"))
+        for rng, price in KURS_PRICES.items()
+    )
+    return Step("pages", _d("📄 Necha bet bo'lsin?", "📄 Сколько страниц?", "📄 How many pages?"),
+                _d("Hajm", "Объём", "Length"), kind="choice", choices=labels)
+
+
+def _count(key: str, uz: str, ru: str, en: str, lbl: tuple, values, **kw) -> Step:
+    return Step(key, _d(uz, ru, en), _d(*lbl), kind="choice", choices=_nums(values), numeric=True, **kw)
+
+
+PAGES_SIMPLE = _count("pages", "📄 Necha bet?", "📄 Сколько страниц?", "📄 How many pages?", ("Hajm (bet)", "Объём (стр.)", "Length (pages)"), (10, 15, 20))
 
 SERVICES: dict[str, Service] = {
     "taqdimot": Service(
-        "taqdimot", "📊", "Taqdimot", 4_500, "1–3 daqiqa",
+        "taqdimot", "📊", _d("Taqdimot", "Презентация", "Presentation"),
+        _d("PPTX va PDF fayl", "Файлы PPTX и PDF", "PPTX and PDF files"),
+        _d("1–3 daqiqa", "1–3 минуты", "1–3 minutes"),
         (
-            _TOPIC,
-            Step("slides", "🎞 Nechta slayd?", kind="choice", choices=_nums((10, 15, 20, 25, 30)), numeric=True),
-            _LANG,
-            Step("presenter", "👤 Birinchi slaydga <b>ismingizni</b> yozaymi?", optional=True, hi=100),
+            LANG_STEP, SUBJECT, TOPIC,
+            _count("slides", "🎞 Nechta slayd?", "🎞 Сколько слайдов?", "🎞 How many slides?", ("Slaydlar", "Слайды", "Slides"), (10, 15, 20, 25, 30)),
+            Step("presenter", _d("👤 Birinchi slaydga <b>ismingizni</b> yozaymi?", "👤 Написать на первом слайде <b>ваше имя</b>?", "👤 Put <b>your name</b> on the first slide?"),
+                 _d("Taqdimotchi", "Докладчик", "Presenter"), optional=True, hi=100),
+            Step("supervisor", _d("🧑‍🏫 <b>Ilmiy rahbar</b> ismi (ixtiyoriy):", "🧑‍🏫 Имя <b>руководителя</b> (необязательно):", "🧑‍🏫 <b>Supervisor</b> name (optional):"),
+                 _d("Rahbar", "Руководитель", "Supervisor"), optional=True, hi=100),
         ),
-        "PPTX va PDF fayl",
+        4_500,
     ),
     "kurs_ishi": Service(
-        "kurs_ishi", "📖", "Kurs ishi", 39_000, "5–15 daqiqa",
-        (
-            _TOPIC, _SUBJECT, _LANG,
-            Step("full_name", "👤 <b>Ism-familiyangiz</b> (titul varag'i uchun):", optional=True, hi=150, target="student"),
-            Step("university", "🏛 <b>Universitet</b> nomi:", optional=True, hi=150, target="student"),
-            Step("faculty", "🏫 <b>Fakultet</b>:", optional=True, hi=150, target="student"),
-            Step("group", "👥 <b>Guruh</b>:", optional=True, hi=150, target="student"),
-            Step("supervisor", "🧑‍🏫 <b>Ilmiy rahbar</b>:", optional=True, hi=150, target="student"),
-        ),
-        "DOCX, 20–30 bet",
+        "kurs_ishi", "📖", _d("Kurs ishi", "Курсовая работа", "Coursework"),
+        _d("DOCX, 20–50 bet", "DOCX, 20–50 стр.", "DOCX, 20–50 pages"),
+        _d("5–15 daqiqa", "5–15 минут", "5–15 minutes"),
+        (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, KAFEDRA, DIRECTION, GROUP, SUPERVISOR, CITY,
+         SUBJECT, TOPIC, _kurs_pages()),
+        KURS_PRICES, profile=True,
     ),
     "mustaqil_ish": Service(
-        "mustaqil_ish", "📝", "Mustaqil ish", 5_500, "2–6 daqiqa",
-        (
-            _TOPIC, _SUBJECT,
-            Step("pages", "📄 Necha bet?", kind="choice", choices=_nums((10, 15, 20)), numeric=True),
-            _LANG,
-            Step("full_name", "👤 <b>Ism-familiyangiz</b> (titul varag'i uchun):", optional=True, hi=150, target="student"),
-            Step("university", "🏛 <b>Universitet</b> nomi:", optional=True, hi=150, target="student"),
-        ),
-        "DOCX, 20 betgacha",
+        "mustaqil_ish", "📝", _d("Mustaqil ish", "Самостоятельная работа", "Independent work"),
+        _d("DOCX, 20 betgacha", "DOCX, до 20 стр.", "DOCX, up to 20 pages"),
+        _d("2–6 daqiqa", "2–6 минут", "2–6 minutes"),
+        (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, SUPERVISOR, SUBJECT, TOPIC, PAGES_SIMPLE),
+        5_500, profile=True,
     ),
     "referat": Service(
-        "referat", "📄", "Referat", 5_500, "2–6 daqiqa",
-        (
-            _TOPIC, _SUBJECT,
-            Step("pages", "📄 Necha bet?", kind="choice", choices=_nums((10, 15, 20)), numeric=True),
-            _LANG,
-            Step("full_name", "👤 <b>Ism-familiyangiz</b> (titul varag'i uchun):", optional=True, hi=150, target="student"),
-            Step("university", "🏛 <b>Universitet</b> nomi:", optional=True, hi=150, target="student"),
-        ),
-        "DOCX, 20 betgacha",
+        "referat", "📄", _d("Referat", "Реферат", "Essay"),
+        _d("DOCX, 20 betgacha", "DOCX, до 20 стр.", "DOCX, up to 20 pages"),
+        _d("2–6 daqiqa", "2–6 минут", "2–6 minutes"),
+        (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, SUPERVISOR, SUBJECT, TOPIC, PAGES_SIMPLE),
+        5_500, profile=True,
     ),
     "test": Service(
-        "test", "❓", "Test", 2_500, "1–3 daqiqa",
-        (
-            Step("topic", "✍️ Test <b>mavzusini</b> yozing:", lo=3, hi=300),
-            Step("questions", "🔢 Nechta savol?", kind="choice", choices=_nums((10, 15, 20, 25, 30)), numeric=True),
-            _LANG,
-        ),
-        "DOCX: savollar va javoblar kaliti",
+        "test", "❓", _d("Test", "Тест", "Test"),
+        _d("DOCX: savollar va javoblar kaliti", "DOCX: вопросы и ключ ответов", "DOCX: questions and answer key"),
+        _d("1–3 daqiqa", "1–3 минуты", "1–3 minutes"),
+        (LANG_STEP, SUBJECT, TOPIC_SHORT,
+         _count("questions", "🔢 Nechta savol?", "🔢 Сколько вопросов?", "🔢 How many questions?", ("Savollar", "Вопросы", "Questions"), (10, 15, 20, 25, 30))),
+        2_500,
     ),
     "krossvord": Service(
-        "krossvord", "🧩", "Krossvord", 1_900, "1–2 daqiqa",
-        (
-            Step("topic", "✍️ Krossvord <b>mavzusini</b> yozing:", lo=3, hi=300),
-            Step("word_count", "🔢 Nechta so'z?", kind="choice", choices=_nums((10, 15, 20, 25, 30)), numeric=True),
-            _LANG,
-        ),
-        "PDF",
+        "krossvord", "🧩", _d("Krossvord", "Кроссворд", "Crossword"),
+        _d("PDF", "PDF", "PDF"),
+        _d("1–2 daqiqa", "1–2 минуты", "1–2 minutes"),
+        (LANG_STEP, SUBJECT, TOPIC_SHORT,
+         _count("word_count", "🔢 Nechta so'z?", "🔢 Сколько слов?", "🔢 How many words?", ("So'zlar", "Слова", "Words"), (10, 15, 20, 25, 30))),
+        1_900,
     ),
 }
 
 ORDER = ("taqdimot", "kurs_ishi", "mustaqil_ish", "referat", "test", "krossvord")
-
-STATUS_LABEL = {
-    "queued": "⏳ Navbatda",
-    "submitted": "⚙️ Tayyorlanmoqda",
-    "processing": "⚙️ Tayyorlanmoqda",
-    "succeeded": "✅ Tayyor",
-    "failed": "❌ Xato (pul qaytarilgan)",
-    "canceled": "🚫 Bekor qilingan",
-}
+STUDENT_KEYS = ("full_name", "university", "faculty", "kafedra", "direction", "group", "supervisor", "city")
 
 
-def money(value: int) -> str:
-    return f"{value:,}".replace(",", " ") + " so'm"
+def title(slug: str, lang: str) -> str:
+    return pick(SERVICES[slug].title, lang)
 
 
 def build_params(service: Service, answers: dict) -> dict:
@@ -138,12 +213,17 @@ def build_params(service: Service, answers: dict) -> dict:
     params: dict = {}
     student: dict = {}
     for step in service.steps:
+        if step.kind == "profile":
+            continue
         value = answers.get(step.key)
         if value in (None, ""):
             continue
         (student if step.target == "student" else params)[step.key] = value
     if student:
         params["student"] = student
-    if service.slug == "kurs_ishi":
-        params["pages"] = "20-30"
+    if service.slug == "krossvord" and params.get("subject"):
+        # Hamkor API'da krossvord uchun `subject` yo'q: fan mavzuga qo'shiladi
+        params["topic"] = f"{params['topic']} ({params['subject']})"
+    if service.slug == "krossvord":
+        params.pop("subject", None)
     return params

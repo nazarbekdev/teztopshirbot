@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS ledger (
     ref TEXT,
     created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS fsm (
+    key TEXT PRIMARY KEY,
+    state TEXT,
+    data TEXT NOT NULL DEFAULT '{}'
+);
 CREATE TABLE IF NOT EXISTS alerts (
     key TEXT PRIMARY KEY,
     sent_at INTEGER NOT NULL
@@ -73,11 +78,25 @@ class Store:
         self.path = path
         self.db: aiosqlite.Connection | None = None
 
+    # Eski bazalarga keyin qo'shilgan ustunlar (CREATE TABLE ularni qayta yaratmaydi)
+    MIGRATIONS = (
+        ("users", "lang", "TEXT"),
+        ("users", "consent_version", "TEXT"),
+        ("users", "consent_at", "INTEGER"),
+        ("users", "profile", "TEXT"),
+        ("orders", "tg_files", "TEXT"),
+        ("payments", "original_amount", "INTEGER"),
+    )
+
     async def open(self) -> "Store":
         self.db = await aiosqlite.connect(self.path)
         self.db.row_factory = aiosqlite.Row
         await self.db.execute("PRAGMA journal_mode=WAL")
         await self.db.executescript(SCHEMA)
+        for table, column, kind in self.MIGRATIONS:
+            cols = {r["name"] for r in await self._all(f"PRAGMA table_info({table})")}
+            if column not in cols:
+                await self.db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
         await self.db.commit()
         return self
 
@@ -111,6 +130,26 @@ class Store:
     async def user(self, tg_id: int) -> dict | None:
         return await self._one("SELECT * FROM users WHERE tg_id=?", (tg_id,))
 
+    async def set_lang(self, tg_id: int, lang: str) -> None:
+        await self.db.execute("UPDATE users SET lang=? WHERE tg_id=?", (lang, tg_id))
+        await self.db.commit()
+
+    async def accept_consent(self, tg_id: int, version: str) -> None:
+        await self.db.execute("UPDATE users SET consent_version=?, consent_at=? WHERE tg_id=?",
+                              (version, now(), tg_id))
+        await self.db.commit()
+
+    async def profile(self, tg_id: int) -> dict:
+        row = await self.user(tg_id)
+        return json.loads(row["profile"]) if row and row["profile"] else {}
+
+    async def save_profile(self, tg_id: int, fields: dict) -> None:
+        """Titul ma'lumotlari: yangi qiymatlar eskisiga qo'shiladi, bo'sh qiymat o'chirmaydi."""
+        merged = {**await self.profile(tg_id), **{k: v for k, v in fields.items() if v}}
+        await self.db.execute("UPDATE users SET profile=? WHERE tg_id=?",
+                              (json.dumps(merged, ensure_ascii=False), tg_id))
+        await self.db.commit()
+
     async def balance(self, tg_id: int) -> int:
         row = await self.user(tg_id)
         return row["balance"] if row else 0
@@ -142,8 +181,14 @@ class Store:
         return ok
 
     # ── buyurtmalar ──────────────────────────────────────────────────────
-    async def place_order(self, tg_id: int, service: str, params: dict, price: int) -> int | None:
-        """Balansdan yechib buyurtma yaratadi. Balans yetmasa None."""
+    async def place_order(self, tg_id: int, service: str, params: dict, price: int,
+                          max_active: int | None = None) -> int | str | None:
+        """
+        Balansdan yechib buyurtma yaratadi. Balans yetmasa None; foydalanuvchining faol
+        buyurtmalari `max_active` ga yetgan bo'lsa "limit" (pul yechilmaydi).
+        """
+        if max_active is not None and await self.active_count(tg_id) >= max_active:
+            return "limit"
         if not await self.debit(tg_id, price, "order", service):
             return None
         cur = await self.db.execute(
@@ -185,6 +230,11 @@ class Store:
         marks = ",".join("?" * len(statuses))
         return await self._all(f"SELECT * FROM orders WHERE status IN ({marks}) ORDER BY id", statuses)
 
+    async def active_count(self, tg_id: int) -> int:
+        row = await self._one(
+            "SELECT COUNT(*) AS n FROM orders WHERE tg_id=? AND status IN ('queued','submitted','processing')", (tg_id,))
+        return row["n"]
+
     async def user_orders(self, tg_id: int, limit: int = 10) -> list[dict]:
         return await self._all("SELECT * FROM orders WHERE tg_id=? ORDER BY id DESC LIMIT ?", (tg_id, limit))
 
@@ -224,6 +274,16 @@ class Store:
             f"UPDATE payments SET status=?, updated_at=?{extra} WHERE id=? AND status=?",
             (to_status, now(), *fields.values(), payment_id, from_status),
         )
+        ok = cur.rowcount == 1
+        await cur.close()
+        await self.db.commit()
+        return await self.payment(payment_id) if ok else None
+
+    async def edit_pending_amount(self, payment_id: int, amount: int) -> dict | None:
+        """Kutilayotgan to'lov summasini o'zgartiradi; asl summa `original_amount` da saqlanadi."""
+        cur = await self.db.execute(
+            "UPDATE payments SET original_amount=COALESCE(original_amount, amount), amount=?, updated_at=? "
+            "WHERE id=? AND status='pending'", (amount, now(), payment_id))
         ok = cur.rowcount == 1
         await cur.close()
         await self.db.commit()
