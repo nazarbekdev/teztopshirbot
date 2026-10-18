@@ -139,13 +139,33 @@ async def test_start_ham_kanalni_tekshiradi(env):
     assert "Salom" in env.last()
 
 
-async def test_tekshiruv_xato_bersa_foydalanuvchi_bloklanmaydi_va_admin_ogohlantiriladi(env):
+async def test_tekshiruv_xato_bersa_ham_otkazilmaydi_va_admin_ogohlantiriladi(env):
     env.settings.required_channel = "@teztopshir"
     subscription._cache.clear()
     env.session.member_error = True                                   # bot kanalda admin emas
     await env.say("📊 Taqdimot")
-    assert "Hujjat qaysi tilda" in env.last()
+    assert "kanalimizga a'zo bo'ling" in env.last()                   # fail-open YO'Q
     assert any(n[0] == "sub_check_failed" for n in env.admin_notes)
+
+
+async def test_til_almashtirish_azo_bolmaganga_menyu_ochmaydi(env):
+    env.settings.required_channel = "@teztopshir"
+    subscription._cache.clear()
+    await env.press("lang:ru")
+    assert "подпишитесь" in env.last()                                # menyu emas, a'zolik talabi
+    assert "Привет" not in env.last()
+
+
+async def test_kanaldan_chiqqan_kesh_tugagach_otmaydi(env):
+    env.settings.required_channel = "@teztopshir"
+    subscription._cache.clear()
+    env.session.members.add(5)
+    await env.say("📊 Taqdimot")
+    assert "Hujjat qaysi tilda" in env.last()
+    env.session.members.discard(5)                                    # kanaldan chiqib ketdi
+    subscription._cache[5] = 0                                        # kesh muddati tugadi
+    await env.say("📝 Mustaqil ish")
+    assert "kanalimizga a'zo bo'ling" in env.last()
 
 
 async def test_adminlar_kanal_tekshiruvidan_ozod(env):
@@ -153,3 +173,11 @@ async def test_adminlar_kanal_tekshiruvidan_ozod(env):
     subscription._cache.clear()
     await env.say("📊 Taqdimot", user=ADMIN)
     assert "Hujjat qaysi tilda" in env.last(1)
+
+
+async def test_adminni_ham_tekshirish_yoqilsa_kanal_soraladi(env):
+    env.settings.required_channel = "@teztopshir"
+    env.settings.channel_check_admins = True
+    subscription._cache.clear()
+    await env.say("📊 Taqdimot", user=ADMIN)
+    assert "kanalimizga a'zo bo'ling" in env.last(1)

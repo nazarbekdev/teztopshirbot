@@ -49,7 +49,7 @@ async def change_lang(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith("lang:"))
-async def lang_chosen(callback: CallbackQuery, state: FSMContext, store, settings):
+async def lang_chosen(callback: CallbackQuery, state: FSMContext, store, settings, alert):
     code = callback.data.split(":")[1]
     if code not in LANGS:
         await callback.answer()
@@ -61,6 +61,10 @@ async def lang_chosen(callback: CallbackQuery, state: FSMContext, store, setting
     user = await store.user(callback.from_user.id)
     if user.get("consent_version") != ui.CONSENT_VERSION:
         await callback.message.answer(t(code, "consent_intro"), parse_mode="HTML", reply_markup=ui.consent_keyboard(code))
+    elif not await subscription.is_member(callback.bot, settings, callback.from_user.id, alert):
+        # Tilni almashtirish a'zo bo'lmaganga menyu ochib bermasligi kerak
+        await callback.message.answer(t(code, "sub_required"), parse_mode="HTML",
+                                      reply_markup=ui.subscribe_keyboard(code, settings.required_channel))
     else:
         await show_menu(callback.message, callback.from_user.full_name, code)
 
