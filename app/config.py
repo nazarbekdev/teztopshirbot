@@ -26,6 +26,7 @@ class Settings:
     click_merchant_id: str = field(default_factory=lambda: os.getenv("CLICK_MERCHANT_ID", ""))
     click_service_id: str = field(default_factory=lambda: os.getenv("CLICK_SERVICE_ID", ""))
     click_secret: str = field(default_factory=lambda: os.getenv("CLICK_SECRET_KEY", ""))
+    click_host: str = field(default_factory=lambda: os.getenv("CLICK_HOST", "127.0.0.1"))
     click_port: int = field(default_factory=lambda: int(os.getenv("CLICK_PORT", "8081")))
     public_url: str = field(default_factory=lambda: os.getenv("PUBLIC_URL", "").rstrip("/"))
     panel_host: str = field(default_factory=lambda: os.getenv("PANEL_HOST", "127.0.0.1"))

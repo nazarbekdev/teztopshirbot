@@ -69,8 +69,8 @@ async def main() -> None:
     if settings.click_enabled:
         runner = web.AppRunner(make_app(store, settings, bot))
         await runner.setup()
-        await web.TCPSite(runner, "0.0.0.0", settings.click_port).start()
-        logger.info("Click qabul qiluvchisi: :%s", settings.click_port)
+        await web.TCPSite(runner, settings.click_host, settings.click_port).start()
+        logger.info("Click qabul qiluvchisi: %s:%s", settings.click_host, settings.click_port)
     else:
         logger.info("Click sozlanmagan — faqat karta orqali to'lov")
 

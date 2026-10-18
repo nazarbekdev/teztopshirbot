@@ -85,6 +85,19 @@ nginx + HTTPS orqali chiqariladi (`PANEL_URL=https://...` bo'lsa cookie `Secure`
   summani tahrirlash), audit jurnali.
 - Pul amallari botdagi bilan **bir xil yo'l**: `app/payments.py` va `Store` (qayta bosishdan himoyalangan), har biri `admin_audit` ga yoziladi.
 
+## Server (95.111.234.221)
+
+- Kod `/var/www/teztopshir-bot`, sirlar `/etc/teztopshir/env` (root:teztopshir, 640), baza `/var/lib/teztopshir/teztopshir.db`
+  (faqat `teztopshir` foydalanuvchisi, 600). Servis: `teztopshir-bot` (alohida foydalanuvchi, `journalctl -u teztopshir-bot -f`).
+- **Yangilash:** `./deploy/deploy.sh` (rsync + pip + restart). Birinchi marta `--first`. `.env` va baza serverga yuborilmaydi.
+- **Zaxira:** har kuni 03:30 `deploy/backup.py` → `/var/lib/teztopshir/backups` (oxirgi 14 nusxa).
+- **Bir vaqtda bitta jarayon:** token bilan faqat BITTA bot ishlashi mumkin. Lokal sinovdan oldin serverdagisini to'xtating:
+  `ssh root@95.111.234.221 systemctl stop teztopshir-bot`.
+- **Panel** hozircha faqat serverning o'zida (`127.0.0.1:8082`): `ssh -L 8082:127.0.0.1:8082 root@95.111.234.221` va
+  http://127.0.0.1:8082. Ommaga chiqarish: DNS A yozuvi + `deploy/nginx-tez.conf` + certbot + `PANEL_URL`/`PUBLIC_URL`.
+- **Click:** `/etc/teztopshir/env` ga `CLICK_MERCHANT_ID`, `CLICK_SERVICE_ID`, `CLICK_SECRET_KEY`, `PUBLIC_URL` qo'shing,
+  `systemctl restart teztopshir-bot`; Click kabinetiga `{PUBLIC_URL}/click/prepare` va `/click/complete`.
+
 ## Ishonchlilik qoidalari
 
 - Pul buyurtma yaratilganda yechiladi, xato/bekor bo'lsa **bir marta** qaytadi (`refunded` bayrog'i).

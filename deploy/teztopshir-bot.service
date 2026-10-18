@@ -1,0 +1,24 @@
+[Unit]
+Description=TezTopshir Telegram Bot (hamkor API ustida) + admin panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=teztopshir
+Group=teztopshir
+WorkingDirectory=/var/www/teztopshir-bot
+EnvironmentFile=/etc/teztopshir/env
+ExecStart=/var/www/teztopshir-bot/venv/bin/python main.py
+UMask=0077
+Restart=always
+RestartSec=10
+# Himoya: faqat o'z bazasiga yoza oladi
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/teztopshir
+
+[Install]
+WantedBy=multi-user.target
