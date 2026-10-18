@@ -7,7 +7,7 @@ fan, mavzu, hajm va qo'shimcha maydonlar. Hamkor API qo'llamaydigan narsa (shabl
 qo'lda reja) bu botda yo'q.
 
 NARX — mijoz narxi (so'm). Hamkor narxi alohida (`GET /credits`); bu yerdagi narx har doim
-undan kamida 20% yuqori (`tests/test_catalog.py`). Narx hajmga QARAMAYDI, faqat kurs ishida
+undan kamida 10% yuqori (`tests/test_catalog.py`). Narx hajmga QARAMAYDI, faqat kurs ishida
 bet oralig'iga qarab 3 pog'ona.
 
 Parametr qiymatlari hamkor API qoidalariga mos (`partner-docs`):
@@ -173,14 +173,14 @@ SERVICES: dict[str, Service] = {
         _d("DOCX, 20 betgacha", "DOCX, до 20 стр.", "DOCX, up to 20 pages"),
         _d("2–6 daqiqa", "2–6 минут", "2–6 minutes"),
         (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, SUPERVISOR, SUBJECT, TOPIC, PAGES_SIMPLE),
-        5_500, profile=True,
+        4_500, profile=True,
     ),
     "referat": Service(
         "referat", "📄", _d("Referat", "Реферат", "Essay"),
         _d("DOCX, 20 betgacha", "DOCX, до 20 стр.", "DOCX, up to 20 pages"),
         _d("2–6 daqiqa", "2–6 минут", "2–6 minutes"),
         (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, SUPERVISOR, SUBJECT, TOPIC, PAGES_SIMPLE),
-        5_500, profile=True,
+        4_500, profile=True,
     ),
     "test": Service(
         "test", "❓", _d("Test", "Тест", "Test"),
@@ -196,7 +196,7 @@ SERVICES: dict[str, Service] = {
         _d("1–2 daqiqa", "1–2 минуты", "1–2 minutes"),
         (LANG_STEP, SUBJECT, TOPIC_SHORT,
          _count("word_count", "🔢 Nechta so'z?", "🔢 Сколько слов?", "🔢 How many words?", ("So'zlar", "Слова", "Words"), (10, 15, 20, 25, 30))),
-        1_900,
+        1_500,
     ),
 }
 

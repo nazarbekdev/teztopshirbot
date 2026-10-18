@@ -209,7 +209,7 @@ async def test_foydalanuvchi_faol_buyurtma_limiti(env):
         await env.press("c:10")
         await env.press("ok")
     assert len(await env.store.orders_by_status("queued")) == 1
-    assert await env.store.balance(5) == 18_100       # ikkinchisidan pul yechilmadi
+    assert await env.store.balance(5) == 18_500       # ikkinchisidan pul yechilmadi
     assert "1" in env.last()
 
 
