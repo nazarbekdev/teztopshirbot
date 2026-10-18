@@ -49,7 +49,7 @@ def test_savollar_tartibi_asosiy_bot_bilan_bir_xil():
     for slug in ORDER:
         assert SERVICES[slug].steps[0].key == "language"
     keys = lambda slug: [s.key for s in SERVICES[slug].steps if s.kind != "profile" and s.target == "params"]
-    assert keys("taqdimot") == ["language", "subject", "topic", "slides", "presenter", "supervisor"]
+    assert keys("taqdimot") == ["language", "subject", "topic", "notes", "template", "slides", "presenter", "supervisor"]
     assert keys("test") == ["language", "subject", "topic", "questions"]
     assert keys("krossvord") == ["language", "subject", "topic", "word_count"]
     assert keys("mustaqil_ish") == ["language", "subject", "topic", "pages"]

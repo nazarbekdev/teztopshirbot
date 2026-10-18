@@ -50,6 +50,14 @@ referat 4 000, test 1 500, krossvord 1 000 (aniq qiymat `/admin` da, `GET /credi
   Xizmatlar ro'yxati, eng ko'p ishlatish soni va muddat panelda (`/promos`) belgilanadi. Bir foydalanuvchi bir kodni bir marta
   kiritadi; bir vaqtda bitta faol kupon. Bepul buyurtma xato bilan tugasa, pul emas, **kupon qaytadi**. Kurs ishi aksiyaga kirmaydi.
 
+## Taqdimot: shablonlar
+
+Taqdimot oqimi asosiy botdagi bilan bir xil tartibda: hujjat tili → fan → mavzu → (mavzu talabaning o'z joyi haqida
+bo'lsa) aniqlashtiruvchi savol → **70 ta dizayn shabloni karuseli** → slaydlar soni → taqdimotchi → rahbar.
+Shablonlar va rasmlar hamkor API'dan (`GET /templates?subject=&topic=`, `/templates/{id}/preview`); fan/mavzuga mos soha
+shablonlari birinchi turadi. Rasm Telegram'ga bir marta yuklanadi va `file_id` bazada (`tpl_files`) saqlanadi.
+API javob bermasa shablon qadami o'tkaziladi va hamkor standart shablonni qo'llaydi. «O'z joyi» qoidasi `app/details.py`.
+
 ## Admin: chek tasdiqlash
 
 Karta to'lovi kartasida uchta tugma: **Tasdiqlash**, **Rad etish**, **Summani tahrirlash** (mijoz noto'g'ri

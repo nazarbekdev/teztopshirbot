@@ -334,6 +334,20 @@ TEXTS: dict[str, dict[str, str]] = {
     "voucher_note": {"uz": "\n🎁 Sizda <b>bepul buyurtma</b> bor.", "ru": "\n🎁 У вас есть <b>бесплатный заказ</b>.", "en": "\n🎁 You have a <b>free order</b>."},
     "btn_free": {"uz": "🎁 Bepul olish", "ru": "🎁 Получить бесплатно", "en": "🎁 Get it free"},
     "free_gone": {"uz": "Bepul buyurtma huquqi topilmadi yoki ishlatilgan.", "ru": "Право на бесплатный заказ не найдено или уже использовано.", "en": "The free order was not found or has already been used."},
+    # ── taqdimot shablonlari ─────────────────────────────────────────────
+    "tpl_select": {"uz": "🎨 Dizayn shablonini tanlang:", "ru": "🎨 Выберите шаблон дизайна:", "en": "🎨 Choose a design template:"},
+    "tpl_hint": {
+        "uz": "Dizayn {pos} / {total} — o'qlar yoki raqamlar bilan ko'rib chiqing",
+        "ru": "Дизайн {pos} / {total} — листайте стрелками или номерами",
+        "en": "Design {pos} / {total} — browse with the arrows or numbers",
+    },
+    "tpl_badge": {
+        "uz": "{emoji} {name} yo'nalishi uchun",
+        "ru": "{emoji} Для направления «{name}»",
+        "en": "{emoji} For {name}",
+    },
+    "btn_select": {"uz": "✅ Tanlash", "ru": "✅ Выбрать", "en": "✅ Select"},
+    "tpl_stale": {"uz": "Bu tugma eskirgan", "ru": "Эта кнопка устарела", "en": "This button is out of date"},
     # ── buyurtmalar ──────────────────────────────────────────────────────
     "no_orders": {"uz": "Hali buyurtmangiz yo'q. Menyudan xizmatni tanlang 👇", "ru": "У вас ещё нет заказов. Выберите услугу в меню 👇", "en": "You have no orders yet. Choose a service from the menu 👇"},
     "orders_title": {"uz": "📦 <b>So'nggi buyurtmalaringiz</b>\n", "ru": "📦 <b>Ваши последние заказы</b>\n", "en": "📦 <b>Your recent orders</b>\n"},

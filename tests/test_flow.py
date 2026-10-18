@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import GetChatMember, SendDocument, SendMessage
+from aiogram.methods import EditMessageMedia, GetChatMember, SendDocument, SendMessage, SendPhoto
 from aiogram.types import CallbackQuery, Chat, ChatMemberLeft, ChatMemberMember, Message, PhotoSize, Update, User
 
 from app import subscription
@@ -42,6 +42,10 @@ class FakeSession(BaseSession):
             user = User(id=method.user_id, is_bot=False, first_name="u")
             return (ChatMemberMember(user=user) if method.user_id in self.members
                     else ChatMemberLeft(user=user))
+        if isinstance(method, (SendPhoto, EditMessageMedia)):
+            chat_id = getattr(method, "chat_id", 0) or 0
+            return Message(message_id=len(self.calls), date=datetime.datetime.now(), chat=Chat(id=chat_id, type="private"),
+                           photo=[PhotoSize(file_id=f"tgphoto{len(self.calls)}", file_unique_id="u", width=1, height=1)])
         if isinstance(method, (SendMessage, SendDocument)):
             return Message(message_id=len(self.calls), date=datetime.datetime.now(),
                            chat=Chat(id=method.chat_id, type="private"), text=getattr(method, "text", None))
@@ -54,10 +58,32 @@ class FakeSession(BaseSession):
         return [m for m in self.calls if isinstance(m, SendDocument) and (chat_id is None or m.chat_id == chat_id)]
 
 
+TEMPLATES = [("corporate_blue", None), ("econ_ledger", "econ"), ("med_clinic", "med"), ("it_terminal", "it")]
+
+
 class FakeApi:
     def __init__(self):
         self.remote = {"result": {"files": [{"id": "fil_1", "name": "a.docx"}]}}
         self.expired = False
+        self.templates_fail = False
+        self.template_calls = []
+        self.preview_calls = []
+
+    async def templates(self, subject="", topic=""):
+        self.template_calls.append((subject, topic))
+        if self.templates_fail:
+            raise PartnerError(503, "unavailable")
+        wanted = "econ" if "iqtisod" in subject.lower() else None
+        order = sorted(TEMPLATES, key=lambda x: 0 if wanted and x[1] == wanted else 1)
+        meta = {"econ": {"id": "econ", "emoji": "📈", "name": {"uz": "Iqtisodiyot", "ru": "Экономика", "en": "Economics"}}}
+        return {"object": "list", "detected_direction": meta.get(wanted), "data": [
+            {"id": tid, "name": {"uz": f"{tid} uz", "ru": f"{tid} ru", "en": f"{tid} en"},
+             "direction": meta.get(d), "slides": [10, 15, 20, 25, 30], "preview_url": f"https://x/{tid}"}
+            for tid, d in order]}
+
+    async def template_preview(self, template_id):
+        self.preview_calls.append(template_id)
+        return b"\x89PNG"
 
     async def get_order(self, order_id):
         if self.expired:
@@ -157,15 +183,16 @@ async def test_taqdimot_toliq_oqim(env):
     await env.press("c:uz")                       # 1) hujjat tili
     await env.say("Iqtisodiyot")                  # 2) fan
     await env.say("Sun'iy intellekt ta'limda")    # 3) mavzu
-    await env.press("c:15")                       # 4) slaydlar
-    await env.press("skip")                       # 5) taqdimotchi
-    await env.press("skip")                       # 6) rahbar
+    await env.press("ts:0")                       # 4) shablon (karusel)
+    await env.press("c:15")                       # 5) slaydlar
+    await env.press("skip")                       # 6) taqdimotchi
+    await env.press("skip")                       # 7) rahbar
     assert "5 500" in env.last()                  # 15 slayd = boshlang'ich 4 500 + 1 000
     await env.press("ok")
     rows = await env.store.orders_by_status("queued")
     assert len(rows) == 1 and rows[0]["service"] == "taqdimot" and rows[0]["price"] == 5_500
     assert json.loads(rows[0]["params"]) == {"language": "uz", "subject": "Iqtisodiyot",
-                                             "topic": "Sun'iy intellekt ta'limda", "slides": 15}
+                                             "topic": "Sun'iy intellekt ta'limda", "template": "econ_ledger", "slides": 15}
     assert await env.store.balance(5) == 4_500
 
 
@@ -255,7 +282,7 @@ async def test_fsm_holati_qayta_ishga_tushganda_saqlanadi(env, store):
     fresh = make_dispatcher(store, env.settings, env.api, env.admin_notes)
     env.dp = fresh
     await env.say("Raqamli iqtisodiyot mavzusi")  # savol uzilmasdan davom etadi
-    assert "slayd" in env.last().lower()
+    assert "shablon" in env.last().lower()
 
 
 async def test_karta_tolovi_summani_tahrirlash_va_tasdiqlash(env, store):

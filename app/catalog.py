@@ -20,6 +20,7 @@ Parametr qiymatlari hamkor API qoidalariga mos (`partner-docs`):
 
 from dataclasses import dataclass
 
+from .details import needs_details
 from .i18n import LANG_NAMES, pick
 
 CURRENCY = {"uz": "so'm", "ru": "сум", "en": "UZS"}
@@ -41,6 +42,7 @@ class Step:
     hi: int = 300
     target: str = "params"                     # params | student
     numeric: bool = False                      # choice qiymati songa aylanadi
+    when: str = ""                             # shartli qadam: "details" — mavzu o'z joyi haqida bo'lsagina so'raladi
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,20 @@ LANG_STEP = Step(
     kind="choice", choices=tuple(LANG_NAMES.items()),
 )
 PROFILE_STEP = Step("_profile", _d("", "", ""), _d("", "", ""), kind="profile")
+TEMPLATE_STEP = Step("template", _d("", "", ""), _d("Shablon", "Шаблон", "Template"), kind="template")
+# Asosiy botdagi savol (faqat mavzu talabaning o'z joyi haqida bo'lsa); javob API'ning `notes` maydoniga ketadi
+DETAILS_STEP = Step(
+    "notes",
+    _d("📍 Bu mavzu <b>sizning joyingiz</b> haqida. Taqdimot aynan u haqida bo'lishi uchun qisqa yozing: shahar/tuman, "
+       "mahalla yoki tashkilot nomi, bilganlaringiz.\n\n<i>Masalan: Samarqand sh., \"Registon\" mahallasi, 1200 xonadon, "
+       "maktab va bozor bor</i>\n\nUmumiy yozilsin desangiz — <b>-</b> yuboring.",
+       "📍 Эта тема о <b>вашем месте</b>. Чтобы презентация была именно о нём, напишите коротко: город/район, махалля "
+       "или организация, что знаете.\n\n<i>Например: г. Самарканд, махалля «Регистан», 1200 домов, есть школа и рынок</i>\n\n"
+       "Если нужно в общем виде — отправьте <b>-</b>.",
+       "📍 This topic is about <b>your own place</b>. So the presentation is about it, briefly write the city/district, "
+       "neighbourhood or organisation and what you know.\n\nIf you want it general — send <b>-</b>."),
+    _d("Qo'shimcha ma'lumot", "Дополнительно", "Details"), optional=True, hi=500, when="details",
+)
 SUBJECT = Step(
     "subject",
     _d("📚 <b>Fan nomi</b>ni yozing (masalan: Menejment):", "📚 Напишите <b>название предмета</b> (например: Менеджмент):",
@@ -172,12 +188,16 @@ SERVICES: dict[str, Service] = {
         _d("PPTX va PDF fayl", "Файлы PPTX и PDF", "PPTX and PDF files"),
         _d("1–3 daqiqa", "1–3 минуты", "1–3 minutes"),
         (
-            LANG_STEP, SUBJECT, TOPIC,
+            LANG_STEP, SUBJECT, TOPIC, DETAILS_STEP, TEMPLATE_STEP,
             _priced(_count("slides", "🎞 Nechta slayd?", "🎞 Сколько слайдов?", "🎞 How many slides?", ("Slaydlar", "Слайды", "Slides"), (10, 15, 20, 25, 30)),
                     SLIDE_PRICES, ("slayd", "слайдов", "slides")),
-            Step("presenter", _d("👤 Birinchi slaydga <b>ismingizni</b> yozaymi?", "👤 Написать на первом слайде <b>ваше имя</b>?", "👤 Put <b>your name</b> on the first slide?"),
+            Step("presenter", _d("👤 Taqdimotchi ismini kiriting:\n\n<i>Masalan: Azizbek Alijonov</i>",
+                                 "👤 Введите имя докладчика:\n\n<i>Например: Азизбек Алижонов</i>",
+                                 "👤 Enter the presenter's name:\n\n<i>Example: Azizbek Alijonov</i>"),
                  _d("Taqdimotchi", "Докладчик", "Presenter"), optional=True, hi=100),
-            Step("supervisor", _d("🧑‍🏫 <b>Ilmiy rahbar</b> ismi (ixtiyoriy):", "🧑‍🏫 Имя <b>руководителя</b> (необязательно):", "🧑‍🏫 <b>Supervisor</b> name (optional):"),
+            Step("supervisor", _d("👨‍🏫 Rahbar (ustoz) ismini kiriting:\n\n<i>Masalan: Prof. Azizbek Alijonov</i>",
+                                  "👨‍🏫 Введите имя руководителя (преподавателя):\n\n<i>Например: Проф. Азизбек Алижонов</i>",
+                                  "👨‍🏫 Enter the supervisor's (teacher's) name:\n\n<i>Example: Prof. Azizbek Alijonov</i>"),
                  _d("Rahbar", "Руководитель", "Supervisor"), optional=True, hi=100),
         ),
         SLIDE_PRICES, price_key="slides",
@@ -239,6 +259,8 @@ def build_params(service: Service, answers: dict) -> dict:
     for step in service.steps:
         if step.kind == "profile":
             continue
+        if step.when == "details" and not needs_details(answers.get("topic", "")):
+            continue                                   # shartli qadam so'ralmagan — eski javob ham ketmaydi
         value = answers.get(step.key)
         if value in (None, ""):
             continue

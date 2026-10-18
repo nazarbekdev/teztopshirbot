@@ -67,6 +67,14 @@ class PartnerClient:
         data = (await self._request("GET", "/credits", retries=2)).json()
         return {b["service"]: b for b in data.get("balances", [])}
 
+    async def templates(self, subject: str = "", topic: str = "") -> dict:
+        """Taqdimot shablonlari (70 ta); fan/mavzu berilsa soha shabloni birinchi turadi."""
+        params = {k: v for k, v in (("subject", subject), ("topic", topic)) if v}
+        return (await self._request("GET", "/templates", params=params, retries=1)).json()
+
+    async def template_preview(self, template_id: str) -> bytes:
+        return (await self._request("GET", f"/templates/{template_id}/preview", retries=1)).content
+
     async def create_order(self, service: str, params: dict, idempotency_key: str,
                            metadata: dict | None = None) -> dict:
         # Qayta urinish YO'Q: `Idempotency-Key` xavfsiz qiladi, lekin qaror (qachon qayta

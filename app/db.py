@@ -76,6 +76,10 @@ CREATE TABLE IF NOT EXISTS vouchers (
     used_at INTEGER,
     UNIQUE(code, tg_id)                -- bitta foydalanuvchi bitta kodni bir marta kiritadi
 );
+CREATE TABLE IF NOT EXISTS tpl_files (
+    template_id TEXT PRIMARY KEY,
+    file_id TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS fsm (
     key TEXT PRIMARY KEY,
     state TEXT,
@@ -244,6 +248,20 @@ class Store:
                               (f"order:{order_id}", tg_id))
         await self.db.commit()
         return order_id
+
+    # ── shablon rasmlari: Telegram file_id keshi ─────────────────────────
+    async def tpl_file(self, template_id: str) -> str | None:
+        row = await self._one("SELECT file_id FROM tpl_files WHERE template_id=?", (template_id,))
+        return row["file_id"] if row else None
+
+    async def set_tpl_file(self, template_id: str, file_id: str) -> None:
+        await self.db.execute("INSERT INTO tpl_files(template_id, file_id) VALUES(?,?) "
+                              "ON CONFLICT(template_id) DO UPDATE SET file_id=excluded.file_id", (template_id, file_id))
+        await self.db.commit()
+
+    async def forget_tpl_file(self, template_id: str) -> None:
+        await self.db.execute("DELETE FROM tpl_files WHERE template_id=?", (template_id,))
+        await self.db.commit()
 
     # ── promokod ─────────────────────────────────────────────────────────
     async def create_promo(self, code: str, services: list[str], max_uses: int | None,
