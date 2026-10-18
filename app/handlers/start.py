@@ -5,7 +5,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from .. import ui
+from .. import subscription, ui
 from ..catalog import ORDER, SERVICES, pick
 from ..i18n import LANGS, t
 
@@ -26,7 +26,7 @@ async def show_menu(message: Message, user_name: str, lang: str) -> None:
 
 
 @router.message(CommandStart())
-async def start(message: Message, state: FSMContext, store, lang):
+async def start(message: Message, state: FSMContext, store, settings, alert, lang):
     await state.clear()
     if not lang:
         await message.answer(t(None, "lang_prompt"), reply_markup=ui.lang_keyboard())
@@ -34,6 +34,10 @@ async def start(message: Message, state: FSMContext, store, lang):
     user = await store.user(message.from_user.id)
     if user.get("consent_version") != ui.CONSENT_VERSION:
         await message.answer(t(lang, "consent_intro"), parse_mode="HTML", reply_markup=ui.consent_keyboard(lang))
+        return
+    if not await subscription.is_member(message.bot, settings, message.from_user.id, alert):
+        await message.answer(t(lang, "sub_required"), parse_mode="HTML",
+                             reply_markup=ui.subscribe_keyboard(lang, settings.required_channel))
         return
     await show_menu(message, message.from_user.full_name, lang)
 
@@ -65,6 +69,18 @@ def _full_text(lang: str, settings) -> str:
     return t(lang, "consent_full", version=ui.CONSENT_VERSION, contact=contact_of(settings, lang))
 
 
+@router.callback_query(F.data == "sub:check")
+async def sub_check(callback: CallbackQuery, store, settings, alert):
+    lang = (await store.user(callback.from_user.id)).get("lang") or "uz"
+    subscription.forget(callback.from_user.id)
+    if not await subscription.is_member(callback.bot, settings, callback.from_user.id, alert):
+        await callback.answer(t(lang, "not_member"), show_alert=True)
+        return
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await show_menu(callback.message, callback.from_user.full_name, lang)
+
+
 @router.callback_query(F.data == "consent:full")
 async def consent_full(callback: CallbackQuery, store, settings):
     lang = (await store.user(callback.from_user.id)).get("lang") or "uz"
@@ -74,11 +90,15 @@ async def consent_full(callback: CallbackQuery, store, settings):
 
 
 @router.callback_query(F.data == "consent:yes")
-async def consent_yes(callback: CallbackQuery, store):
+async def consent_yes(callback: CallbackQuery, store, settings, alert):
     lang = (await store.user(callback.from_user.id)).get("lang") or "uz"
     await store.accept_consent(callback.from_user.id, ui.CONSENT_VERSION)
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
+    if not await subscription.is_member(callback.bot, settings, callback.from_user.id, alert):
+        await callback.message.answer(t(lang, "sub_required"), parse_mode="HTML",
+                                      reply_markup=ui.subscribe_keyboard(lang, settings.required_channel))
+        return
     await show_menu(callback.message, callback.from_user.full_name, lang)
 
 

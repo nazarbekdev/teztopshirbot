@@ -57,6 +57,25 @@ CREATE TABLE IF NOT EXISTS ledger (
     ref TEXT,
     created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS promo_codes (
+    code TEXT PRIMARY KEY,
+    services TEXT NOT NULL,            -- JSON: bepul olinadigan xizmatlar ro'yxati
+    max_uses INTEGER,                  -- NULL = cheksiz
+    expires_at INTEGER,                -- NULL = muddatsiz
+    active INTEGER NOT NULL DEFAULT 1,
+    note TEXT,
+    created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS vouchers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tg_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    status TEXT NOT NULL,              -- active | used
+    order_id INTEGER,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER,
+    UNIQUE(code, tg_id)                -- bitta foydalanuvchi bitta kodni bir marta kiritadi
+);
 CREATE TABLE IF NOT EXISTS fsm (
     key TEXT PRIMARY KEY,
     state TEXT,
@@ -107,6 +126,7 @@ class Store:
         ("users", "consent_at", "INTEGER"),
         ("users", "profile", "TEXT"),
         ("orders", "tg_files", "TEXT"),
+        ("orders", "voucher_id", "INTEGER"),
         ("payments", "original_amount", "INTEGER"),
     )
 
@@ -225,6 +245,91 @@ class Store:
         await self.db.commit()
         return order_id
 
+    # ── promokod ─────────────────────────────────────────────────────────
+    async def create_promo(self, code: str, services: list[str], max_uses: int | None,
+                           expires_at: int | None, note: str = "") -> bool:
+        cur = await self.db.execute(
+            "INSERT OR IGNORE INTO promo_codes(code, services, max_uses, expires_at, active, note, created_at) "
+            "VALUES(?,?,?,?,1,?,?)", (code, json.dumps(services), max_uses, expires_at, note, now()))
+        ok = cur.rowcount == 1
+        await cur.close()
+        await self.db.commit()
+        return ok
+
+    async def promo(self, code: str) -> dict | None:
+        return await self._one("SELECT * FROM promo_codes WHERE code=?", (code,))
+
+    async def set_promo_active(self, code: str, active: bool) -> None:
+        await self.db.execute("UPDATE promo_codes SET active=? WHERE code=?", (int(active), code))
+        await self.db.commit()
+
+    async def list_promos(self) -> list[dict]:
+        return await self._all(
+            "SELECT p.*, (SELECT COUNT(*) FROM vouchers v WHERE v.code=p.code) AS used, "
+            "(SELECT COUNT(*) FROM vouchers v WHERE v.code=p.code AND v.status='used') AS spent "
+            "FROM promo_codes p ORDER BY created_at DESC")
+
+    async def redeem(self, code: str, tg_id: int) -> tuple[str, dict | None]:
+        """
+        Promokodni kiritadi. Natija: ("ok", kupon) yoki xato kodi:
+        invalid | expired | limit | used | has_active.
+        Hisoblash va yozish bitta so'rovda ketma-ket (bitta ulanish) — chegaradan oshib ketmaydi.
+        """
+        promo = await self.promo(code)
+        if promo is None or not promo["active"]:
+            return "invalid", None
+        if promo["expires_at"] and promo["expires_at"] < now():
+            return "expired", None
+        if await self._one("SELECT 1 FROM vouchers WHERE code=? AND tg_id=?", (code, tg_id)):
+            return "used", None
+        if await self._one("SELECT 1 FROM vouchers WHERE tg_id=? AND status='active'", (tg_id,)):
+            return "has_active", None
+        if promo["max_uses"] is not None:
+            taken = (await self._one("SELECT COUNT(*) AS n FROM vouchers WHERE code=?", (code,)))["n"]
+            if taken >= promo["max_uses"]:
+                return "limit", None
+        cur = await self.db.execute(
+            "INSERT INTO vouchers(tg_id, code, status, created_at) VALUES(?,?, 'active', ?)", (tg_id, code, now()))
+        voucher_id = cur.lastrowid
+        await cur.close()
+        await self.db.commit()
+        return "ok", {"id": voucher_id, "services": json.loads(promo["services"]), "code": code}
+
+    async def active_voucher(self, tg_id: int) -> dict | None:
+        row = await self._one(
+            "SELECT v.*, p.services FROM vouchers v JOIN promo_codes p ON p.code=v.code "
+            "WHERE v.tg_id=? AND v.status='active' ORDER BY v.id LIMIT 1", (tg_id,))
+        if row:
+            row["services"] = json.loads(row["services"])
+        return row
+
+    async def place_free_order(self, tg_id: int, service: str, params: dict, voucher_id: int,
+                               max_active: int | None = None) -> int | str | None:
+        """
+        Kupon bilan bepul buyurtma. Kupon FAQAT 'active' bo'lsa va shu foydalanuvchiniki bo'lsa sarflanadi
+        (bitta shartli UPDATE: ikki marta bosish ikki buyurtma bermaydi). None — kupon yaroqsiz, "limit" — faol
+        buyurtmalar chegarasi.
+        """
+        if max_active is not None and await self.active_count(tg_id) >= max_active:
+            return "limit"
+        cur = await self.db.execute(
+            "UPDATE vouchers SET status='used', used_at=? WHERE id=? AND tg_id=? AND status='active'",
+            (now(), voucher_id, tg_id))
+        ok = cur.rowcount == 1
+        await cur.close()
+        if not ok:
+            await self.db.commit()
+            return None
+        cur = await self.db.execute(
+            "INSERT INTO orders(tg_id, service, params, price, status, voucher_id, created_at, updated_at) "
+            "VALUES(?,?,?,0,'queued',?,?,?)",
+            (tg_id, service, json.dumps(params, ensure_ascii=False), voucher_id, now(), now()))
+        order_id = cur.lastrowid
+        await cur.close()
+        await self.db.execute("UPDATE vouchers SET order_id=? WHERE id=?", (order_id, voucher_id))
+        await self.db.commit()
+        return order_id
+
     async def order(self, order_id: int) -> dict | None:
         return await self._one("SELECT * FROM orders WHERE id=?", (order_id,))
 
@@ -245,6 +350,12 @@ class Store:
         if not first:
             return False
         row = await self.order(order_id)
+        if row["voucher_id"]:
+            # Bepul buyurtma: pul emas, promokod huquqi qaytadi
+            await self.db.execute("UPDATE vouchers SET status='active', order_id=NULL, used_at=NULL WHERE id=?",
+                                  (row["voucher_id"],))
+            await self.db.commit()
+            return True
         await self.credit(row["tg_id"], row["price"], "refund", f"order:{order_id}")
         return True
 

@@ -40,6 +40,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px
 <a href="/orders" class="{{ 'on' if active=='orders' }}">Buyurtmalar</a>
 <a href="/users" class="{{ 'on' if active=='users' }}">Foydalanuvchilar</a>
 <a href="/payments" class="{{ 'on' if active=='payments' }}">To'lovlar{% if pending %} <span class="badge b-pending">{{ pending }}</span>{% endif %}</a>
+<a href="/promos" class="{{ 'on' if active=='promos' }}">Promokodlar</a>
 <a href="/audit" class="{{ 'on' if active=='audit' }}">Audit</a>
 <span class="sp"></span>
 <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="x">Chiqish</button></form>

@@ -14,6 +14,7 @@ from aiohttp import web
 
 from .. import payments, ui
 from ..catalog import ORDER, SERVICES, money, pick
+from ..handlers.promo import normalize
 from . import auth
 
 logger = logging.getLogger(__name__)
@@ -220,6 +221,45 @@ async def payment_decide(request: web.Request) -> web.Response:
     raise back("/payments", ok=f"#{pid} {'tasdiqlandi' if action == 'approve' else 'rad etildi'}.")
 
 
+async def promos(request: web.Request) -> web.Response:
+    rows = await request.app["store"].list_promos()
+    for p in rows:
+        slugs = json.loads(p["services"])
+        p["services_text"] = ", ".join(pick(SERVICES[s].title, "uz") for s in slugs if s in SERVICES)
+        expired = bool(p["expires_at"] and p["expires_at"] < time.time())
+        full = p["max_uses"] is not None and p["used"] >= p["max_uses"]
+        p["live"] = bool(p["active"]) and not expired and not full
+    return await render(request, "promos.html", active="promos", promos=rows,
+                        services=[{"slug": s, "title": pick(SERVICES[s].title, "uz")} for s in ORDER])
+
+
+async def promo_create(request: web.Request) -> web.Response:
+    store, admin_id = request.app["store"], request["admin_id"]
+    form = await request.post()
+    code = normalize(str(form.get("code", "")))
+    slugs = [s for s in form.getall("services", []) if s in SERVICES]
+    if len(code) < 3 or not slugs:
+        raise back("/promos", err="Kod kamida 3 belgi va kamida bitta xizmat tanlanishi kerak.")
+    digits = lambda name: int(str(form.get(name, "")).strip()) if str(form.get(name, "")).strip().isdigit() else None
+    max_uses, days = digits("max_uses"), digits("days")
+    expires = int(time.time()) + days * 86400 if days else None
+    if not await store.create_promo(code, slugs, max_uses, expires, str(form.get("note", ""))[:100]):
+        raise back("/promos", err=f"{code} kodi allaqachon mavjud.")
+    await store.audit(admin_id, "promo_create", f"{code} xizmatlar={','.join(slugs)} chegara={max_uses} kun={days}")
+    raise back("/promos", ok=f"{code} yaratildi.")
+
+
+async def promo_toggle(request: web.Request) -> web.Response:
+    store, admin_id = request.app["store"], request["admin_id"]
+    code = request.match_info["code"]
+    promo = await store.promo(code)
+    if promo is None:
+        raise web.HTTPNotFound()
+    await store.set_promo_active(code, not promo["active"])
+    await store.audit(admin_id, "promo_toggle", f"{code} → {'faol' if not promo['active'] else 'ochiq'}")
+    raise back("/promos", ok=f"{code}: {'yoqildi' if not promo['active'] else 'o`chirildi'}.")
+
+
 async def audit_log(request: web.Request) -> web.Response:
     return await render(request, "audit.html", active="audit", audit=await request.app["store"].recent_audit())
 
@@ -243,5 +283,8 @@ def make_app(store, settings, bot, api, bot_username: str) -> web.Application:
     r.add_get("/payments", payments_list)
     r.add_get(r"/payments/{id:\d+}/receipt", receipt)
     r.add_post(r"/payments/{id:\d+}/{action:approve|reject|edit}", payment_decide)
+    r.add_get("/promos", promos)
+    r.add_post("/promos/create", promo_create)
+    r.add_post(r"/promos/{code:[A-Z0-9]+}/toggle", promo_toggle)
     r.add_get("/audit", audit_log)
     return app

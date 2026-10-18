@@ -39,8 +39,9 @@ def _amount_kb(lang: str):
 async def show_balance(message: Message, state: FSMContext, store, lang):
     await state.clear()
     balance = await store.balance(message.from_user.id)
+    note = t(lang, "voucher_note") if await store.active_voucher(message.from_user.id) else ""
     await message.answer(
-        t(lang, "balance_screen", amount=money(balance, lang)), parse_mode="HTML",
+        t(lang, "balance_screen", amount=money(balance, lang)) + note, parse_mode="HTML",
         reply_markup=ui.inline([IB(text=t(lang, "btn_topup"), callback_data="topup:0", style="success")]))
 
 

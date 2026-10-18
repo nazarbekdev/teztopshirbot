@@ -6,13 +6,13 @@ import logging
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message
 
-from . import ui
+from . import subscription, ui
 from .i18n import t
 
 logger = logging.getLogger(__name__)
 
 FREE_COMMANDS = ("/start", "/privacy")
-FREE_CALLBACKS = ("lang:", "consent:")
+FREE_CALLBACKS = ("lang:", "consent:", "sub:")
 ADMIN_CALLBACKS = ("pa:", "pr:", "pe:", "al:")
 
 
@@ -57,6 +57,12 @@ class Onboarding(BaseMiddleware):
                 await event.answer()
             await target.answer(t(lang, "consent_needed") + "\n\n" + t(lang, "consent_intro"),
                                 parse_mode="HTML", reply_markup=ui.consent_keyboard(lang))
+            return None
+        if not await subscription.is_member(event.bot, settings, user.id, data.get("alert")):
+            if isinstance(event, CallbackQuery):
+                await event.answer()
+            await target.answer(t(lang, "sub_required"), parse_mode="HTML",
+                                reply_markup=ui.subscribe_keyboard(lang, settings.required_channel))
             return None
         data["lang"] = lang
         return await handler(event, data)

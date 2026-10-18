@@ -42,6 +42,14 @@ referat 4 000, test 1 500, krossvord 1 000 (aniq qiymat `/admin` da, `GET /credi
 - FSM holati **SQLite'da** (`app/fsm_storage.py`): bot qayta ishga tushsa ham foydalanuvchi savol-javobi uzilmaydi.
 - Kurs ishi / mustaqil ish / referatda titul ma'lumotlari saqlanadi va keyingi buyurtmada taklif qilinadi.
 
+## Kanalga a'zolik va promokod
+
+- `REQUIRED_CHANNEL=@kanal`: `/start` va barcha amallar kanal a'zoligini talab qiladi (adminlar ozod). **Bot kanalda admin bo'lishi shart.**
+  Tekshiruv xato bersa (bot admin emas va h.k.) foydalanuvchi bloklanmaydi, adminga soatiga bir ogohlantirish ketadi (`app/subscription.py`).
+- **Promokod:** kanalda e'lon qilinadi, botda «🎁 Promokod» (yoki `/promo`) orqali kiritiladi → **bitta bepul buyurtma** huquqi (kupon).
+  Xizmatlar ro'yxati, eng ko'p ishlatish soni va muddat panelda (`/promos`) belgilanadi. Bir foydalanuvchi bir kodni bir marta
+  kiritadi; bir vaqtda bitta faol kupon. Bepul buyurtma xato bilan tugasa, pul emas, **kupon qaytadi**. Kurs ishi aksiyaga kirmaydi.
+
 ## Admin: chek tasdiqlash
 
 Karta to'lovi kartasida uchta tugma: **Tasdiqlash**, **Rad etish**, **Summani tahrirlash** (mijoz noto'g'ri

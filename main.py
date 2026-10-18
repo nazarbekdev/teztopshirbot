@@ -13,7 +13,7 @@ from app.api import PartnerClient
 from app.click_server import make_app
 from app.db import Store
 from app.fsm_storage import SqliteStorage
-from app.handlers import admin, balance, order, orders, panel_login, start
+from app.handlers import admin, balance, order, orders, panel_login, promo, start
 from app.panel.routes import make_app as make_panel
 from app.middleware import Onboarding
 from app.worker import Worker
@@ -55,11 +55,11 @@ async def main() -> None:
 
     # FSM holati bazada: bot qayta ishga tushsa foydalanuvchining savol-javobi yo'qolmaydi
     dp = Dispatcher(storage=SqliteStorage(store))
-    dp.workflow_data.update(store=store, settings=settings, api=api, notify_admins=notify_admins)
+    dp.workflow_data.update(store=store, settings=settings, api=api, notify_admins=notify_admins, alert=alert)
     dp.message.outer_middleware(Onboarding())
     dp.callback_query.outer_middleware(Onboarding())
     # panel_login `start` dan OLDIN: `/start alogin_...` umumiy /start ga tushib ketmasin
-    for module in (panel_login, start, order, orders, balance, admin):
+    for module in (panel_login, start, promo, order, orders, balance, admin):
         dp.include_router(module.router)
 
     worker = Worker(store, api, bot, settings.max_active, alert)

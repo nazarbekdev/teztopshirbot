@@ -207,3 +207,22 @@ async def test_bosh_sahifa_kreditlar_va_api_xatosi(panel):
 async def test_kirish_urinishlari_cheklanadi(panel):
     statuses = [(await panel.get("/login")).status for _ in range(12)]
     assert statuses[:10] == [200] * 10 and statuses[10:] == [429, 429]
+
+
+async def test_panelda_promokod_yaratish_va_ochirish(panel):
+    csrf = await login(panel)
+    r = await panel.post("/promos/create", data={"code": "tez start", "max_uses": "300", "days": "30",
+                                                 "note": "kanal posti", "services": ["test", "referat", "kurs_ishi_yoq"],
+                                                 "csrf": csrf}, allow_redirects=False)
+    assert r.status == 302
+    promo = await panel.store.promo("TEZSTART")
+    assert json.loads(promo["services"]) == ["test", "referat"] and promo["max_uses"] == 300 and promo["expires_at"]
+    page = await (await panel.get("/promos")).text()
+    assert "TEZSTART" in page and "faol" in page
+    r = await panel.post("/promos/create", data={"code": "TEZSTART", "services": ["test"], "csrf": csrf}, allow_redirects=False)
+    assert "allaqachon" in r.headers["Location"].lower() or "allaqachon" in __import__("urllib.parse").parse.unquote(r.headers["Location"])
+    await panel.post("/promos/TEZSTART/toggle", data={"csrf": csrf}, allow_redirects=False)
+    assert (await panel.store.promo("TEZSTART"))["active"] == 0
+    assert (await panel.store.redeem("TEZSTART", 1))[0] == "invalid"
+    r = await panel.post("/promos/create", data={"code": "AB", "csrf": csrf}, allow_redirects=False)
+    assert await panel.store.promo("AB") is None                       # qisqa kod va xizmatsiz — yaratilmaydi

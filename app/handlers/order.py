@@ -168,12 +168,18 @@ async def _confirm(target: Message, state: FSMContext, store, lang: str, user_id
     await state.set_state(Flow.confirming)
     text = t(lang, "confirm_screen", emoji=service.emoji, title=pick(service.title, lang),
              summary=_summary(data["slug"], data["answers"], lang), price=money(price, lang), balance=money(balance, lang))
+    voucher = await store.active_voucher(user_id)
+    free = [[IB(text=t(lang, "btn_free"), callback_data="free", style="success")]] \
+        if voucher and data["slug"] in voucher["services"] else []
+    if free:
+        text += t(lang, "voucher_note")
     if balance >= price:
-        kb = ui.inline([IB(text=t(lang, "btn_order"), callback_data="ok", style="success")], [ui.cancel_button(lang)])
+        kb = ui.inline(*free, [IB(text=t(lang, "btn_order"), callback_data="ok", style="primary" if free else "success")],
+                       [ui.cancel_button(lang)])
     else:
         need = price - balance
         text += t(lang, "short_by", need=money(need, lang))
-        kb = ui.inline([IB(text=t(lang, "btn_topup_short"), callback_data=f"topup:{need}", style="primary")],
+        kb = ui.inline(*free, [IB(text=t(lang, "btn_topup_short"), callback_data=f"topup:{need}", style="primary")],
                        [ui.cancel_button(lang)])
     await target.answer(text, parse_mode="HTML", reply_markup=kb)
 
@@ -195,6 +201,35 @@ async def on_ok(callback: CallbackQuery, state: FSMContext, store, settings, lan
         return
     if result is None:
         await callback.message.answer(t(lang, "balance_low"))
+        return
+    if service.profile:
+        await store.save_profile(uid, {k: data["answers"].get(k) for k in STUDENT_KEYS})
+    await callback.message.answer(
+        t(lang, "order_accepted", id=result, emoji=service.emoji, title=pick(service.title, lang),
+          eta=pick(service.eta, lang)),
+        parse_mode="HTML", reply_markup=ui.main_menu(lang))
+
+
+@router.callback_query(Flow.confirming, F.data == "free")
+async def on_free(callback: CallbackQuery, state: FSMContext, store, settings, lang):
+    data = await state.get_data()
+    await state.clear()
+    slug = data["slug"]
+    service = SERVICES[slug]
+    uid = callback.from_user.id
+    voucher = await store.active_voucher(uid)
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    if not voucher or slug not in voucher["services"]:
+        await callback.message.answer(t(lang, "free_gone"))
+        return
+    result = await store.place_free_order(uid, slug, build_params(service, data["answers"]), voucher["id"],
+                                          max_active=settings.per_user_active)
+    if result == "limit":
+        await callback.message.answer(t(lang, "too_many_active", n=settings.per_user_active))
+        return
+    if result is None:
+        await callback.message.answer(t(lang, "free_gone"))
         return
     if service.profile:
         await store.save_profile(uid, {k: data["answers"].get(k) for k in STUDENT_KEYS})

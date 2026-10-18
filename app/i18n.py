@@ -293,6 +293,47 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "🎉 Оплата прошла: <b>+{amount}</b>. Баланс пополнен.",
         "en": "🎉 Payment successful: <b>+{amount}</b>. Your balance has been topped up.",
     },
+    # ── kanalga a'zolik va promokod ──────────────────────────────────────
+    "sub_required": {
+        "uz": ("📢 <b>Botdan foydalanish uchun kanalimizga a'zo bo'ling</b>\n\n"
+               "Kanalda yangiliklar va <b>🎁 bepul xizmat beradigan promokodlar</b> e'lon qilinadi.\n\n"
+               "A'zo bo'lgach «✅ A'zo bo'ldim» tugmasini bosing 👇"),
+        "ru": ("📢 <b>Чтобы пользоваться ботом, подпишитесь на наш канал</b>\n\n"
+               "В канале публикуются новости и <b>🎁 промокоды на бесплатные услуги</b>.\n\n"
+               "После подписки нажмите «✅ Я подписался» 👇"),
+        "en": ("📢 <b>Please subscribe to our channel to use the bot</b>\n\n"
+               "The channel posts news and <b>🎁 promo codes for free services</b>.\n\n"
+               "After subscribing, press “✅ I've subscribed” 👇"),
+    },
+    "btn_channel": {"uz": "📢 Kanalga o'tish", "ru": "📢 Перейти в канал", "en": "📢 Open channel"},
+    "btn_subscribed": {"uz": "✅ A'zo bo'ldim", "ru": "✅ Я подписался", "en": "✅ I've subscribed"},
+    "not_member": {"uz": "Hali kanalga a'zo emassiz", "ru": "Вы ещё не подписаны на канал", "en": "You haven't subscribed to the channel yet"},
+    "btn_promo": {"uz": "🎁 Promokod", "ru": "🎁 Промокод", "en": "🎁 Promo code"},
+    "promo_ask": {
+        "uz": "🎁 <b>Promokod</b>\n\nKanalimizdagi promokodni yozing:",
+        "ru": "🎁 <b>Промокод</b>\n\nНапишите промокод из нашего канала:",
+        "en": "🎁 <b>Promo code</b>\n\nEnter the promo code from our channel:",
+    },
+    "promo_ok": {
+        "uz": ("🎉 <b>Promokod qabul qilindi!</b>\n\nQuyidagi xizmatlardan <b>istalgan bittasi bepul</b> (hajmi ahamiyatsiz):\n{services}\n\n"
+               "Xizmatni tanlang va tasdiqlash ekranida «🎁 Bepul olish» tugmasini bosing."),
+        "ru": ("🎉 <b>Промокод принят!</b>\n\nИз этих услуг <b>любая одна — бесплатно</b> (объём не важен):\n{services}\n\n"
+               "Выберите услугу и на экране подтверждения нажмите «🎁 Получить бесплатно»."),
+        "en": ("🎉 <b>Promo code accepted!</b>\n\n<b>Any one</b> of these services is <b>free</b> (any size):\n{services}\n\n"
+               "Choose a service and press “🎁 Get it free” on the confirmation screen."),
+    },
+    "promo_invalid": {"uz": "❌ Bunday promokod yo'q yoki o'chirilgan. Kodni tekshirib, qayta yozing.", "ru": "❌ Такого промокода нет или он отключён. Проверьте код и напишите ещё раз.", "en": "❌ This promo code doesn't exist or is disabled. Check it and try again."},
+    "promo_expired": {"uz": "⌛ Bu promokod muddati tugagan.", "ru": "⌛ Срок действия этого промокода истёк.", "en": "⌛ This promo code has expired."},
+    "promo_limit": {"uz": "😔 Bu promokod bo'yicha bepul xizmatlar tugab bo'ldi.", "ru": "😔 Бесплатные услуги по этому промокоду закончились.", "en": "😔 The free services for this promo code have run out."},
+    "promo_used": {"uz": "Siz bu promokodni allaqachon kiritgansiz.", "ru": "Вы уже вводили этот промокод.", "en": "You have already used this promo code."},
+    "promo_has_active": {
+        "uz": "🎁 Sizda allaqachon bepul buyurtma bor. Avval undan foydalaning, keyin yangi promokod kiritasiz.",
+        "ru": "🎁 У вас уже есть бесплатный заказ. Сначала используйте его, затем вводите новый промокод.",
+        "en": "🎁 You already have a free order. Use it first, then enter a new promo code.",
+    },
+    "voucher_note": {"uz": "\n🎁 Sizda <b>bepul buyurtma</b> bor.", "ru": "\n🎁 У вас есть <b>бесплатный заказ</b>.", "en": "\n🎁 You have a <b>free order</b>."},
+    "btn_free": {"uz": "🎁 Bepul olish", "ru": "🎁 Получить бесплатно", "en": "🎁 Get it free"},
+    "free_gone": {"uz": "Bepul buyurtma huquqi topilmadi yoki ishlatilgan.", "ru": "Право на бесплатный заказ не найдено или уже использовано.", "en": "The free order was not found or has already been used."},
     # ── buyurtmalar ──────────────────────────────────────────────────────
     "no_orders": {"uz": "Hali buyurtmangiz yo'q. Menyudan xizmatni tanlang 👇", "ru": "У вас ещё нет заказов. Выберите услугу в меню 👇", "en": "You have no orders yet. Choose a service from the menu 👇"},
     "orders_title": {"uz": "📦 <b>So'nggi buyurtmalaringiz</b>\n", "ru": "📦 <b>Ваши последние заказы</b>\n", "en": "📦 <b>Your recent orders</b>\n"},

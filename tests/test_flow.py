@@ -7,12 +7,14 @@ from types import SimpleNamespace
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import SendDocument, SendMessage
-from aiogram.types import CallbackQuery, Chat, Message, PhotoSize, Update, User
+from aiogram.methods import GetChatMember, SendDocument, SendMessage
+from aiogram.types import CallbackQuery, Chat, ChatMemberLeft, ChatMemberMember, Message, PhotoSize, Update, User
+
+from app import subscription
 
 from app.api import PartnerError
 from app.fsm_storage import SqliteStorage
-from app.handlers import admin, balance, order, orders, start
+from app.handlers import admin, balance, order, orders, promo, start
 from app.middleware import Onboarding
 
 CUSTOMER = User(id=5, is_bot=False, first_name="Ali")
@@ -23,6 +25,8 @@ class FakeSession(BaseSession):
     def __init__(self):
         super().__init__()
         self.calls = []
+        self.members: set[int] = set()
+        self.member_error = False
 
     async def close(self):
         pass
@@ -32,6 +36,12 @@ class FakeSession(BaseSession):
 
     async def make_request(self, bot, method, timeout=None):
         self.calls.append(method)
+        if isinstance(method, GetChatMember):
+            if self.member_error:
+                raise RuntimeError("bot kanalda admin emas")
+            user = User(id=method.user_id, is_bot=False, first_name="u")
+            return (ChatMemberMember(user=user) if method.user_id in self.members
+                    else ChatMemberLeft(user=user))
         if isinstance(method, (SendMessage, SendDocument)):
             return Message(message_id=len(self.calls), date=datetime.datetime.now(),
                            chat=Chat(id=method.chat_id, type="private"), text=getattr(method, "text", None))
@@ -91,10 +101,13 @@ def make_dispatcher(store, settings, api, admin_notes):
         admin_notes.append((text, photo, markup))
 
     dp = Dispatcher(storage=SqliteStorage(store))
-    dp.workflow_data.update(store=store, settings=settings, api=api, notify_admins=notify_admins)
+    async def alert(key, text):
+        admin_notes.append((key, text, None))
+
+    dp.workflow_data.update(store=store, settings=settings, api=api, notify_admins=notify_admins, alert=alert)
     dp.message.outer_middleware(Onboarding())
     dp.callback_query.outer_middleware(Onboarding())
-    for module in (start, order, orders, balance, admin):
+    for module in (start, promo, order, orders, balance, admin):
         module.router._parent_router = None   # modul darajasidagi router: har testda yangi Dispatcher
         dp.include_router(module.router)
     return dp
@@ -103,7 +116,7 @@ def make_dispatcher(store, settings, api, admin_notes):
 @pytest_asyncio.fixture
 async def env(store):
     settings = SimpleNamespace(admin_ids=[1], card_number="8600 0000 0000 0000", card_holder="Ali", click_enabled=False,
-                               support_username="support", per_user_active=5)
+                               support_username="support", per_user_active=5, required_channel="")
     session, api, notes = FakeSession(), FakeApi(), []
     bot = Bot("123456:TEST", session=session)
     e = Env(store, session, make_dispatcher(store, settings, api, notes), bot, notes, api)
