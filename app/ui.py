@@ -30,7 +30,7 @@ def main_menu(lang: str) -> ReplyKeyboardMarkup:
         pair = slugs[i:i + 2]
         rows.append([KB(text=label(s, lang), style=("primary", "success")[j]) for j, s in enumerate(pair)])
     rows.append([KB(text=t(lang, "btn_balance"), style="primary"), KB(text=t(lang, "btn_orders"), style="success")])
-    rows.append([KB(text=t(lang, "btn_promo"), style="success"), KB(text=t(lang, "btn_lang"), style="primary")])
+    rows.append([KB(text=t(lang, "btn_lang"), style="primary"), KB(text=t(lang, "btn_promo"), style="success")])
     rows.append([KB(text=t(lang, "btn_help"), style="danger")])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, input_field_placeholder=t(lang, "menu_placeholder"))
 
