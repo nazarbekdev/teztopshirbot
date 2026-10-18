@@ -160,13 +160,13 @@ async def test_taqdimot_toliq_oqim(env):
     await env.press("c:15")                       # 4) slaydlar
     await env.press("skip")                       # 5) taqdimotchi
     await env.press("skip")                       # 6) rahbar
-    assert "4 500" in env.last()
+    assert "5 500" in env.last()                  # 15 slayd = boshlang'ich 4 500 + 1 000
     await env.press("ok")
     rows = await env.store.orders_by_status("queued")
-    assert len(rows) == 1 and rows[0]["service"] == "taqdimot"
+    assert len(rows) == 1 and rows[0]["service"] == "taqdimot" and rows[0]["price"] == 5_500
     assert json.loads(rows[0]["params"]) == {"language": "uz", "subject": "Iqtisodiyot",
                                              "topic": "Sun'iy intellekt ta'limda", "slides": 15}
-    assert await env.store.balance(5) == 5_500
+    assert await env.store.balance(5) == 4_500
 
 
 async def test_kurs_ishi_pogona_narxi_va_titul_saqlanadi(env):
@@ -317,3 +317,31 @@ async def test_til_ozgartirish_menyuni_yangilaydi(env, store):
     await env.press("lang:en")
     assert (await store.user(5))["lang"] == "en"
     assert "Hello" in env.last()
+
+
+async def test_hajmga_qarab_narx_referat_va_test(env):
+    await env.store.credit(5, 50_000, "topup")
+    await env.say("📄 Referat")
+    await env.press("c:uz")
+    await env.press("skipall")
+    await env.say("Tarix")
+    await env.say("Amir Temur davri")
+    await env.press("c:20")                         # 20 bet = 4 500 + 2 × 1 000
+    assert "6 500" in env.last()
+    await env.press("ok")
+    assert await env.store.balance(5) == 43_500
+
+    await env.say("❓ Test")
+    await env.press("c:uz")
+    await env.say("Fizika")
+    await env.say("Mexanika asoslari")
+    await env.press("c:30")                         # 30 savol = 2 500 + 4 × 1 000
+    assert "6 500" in env.last()
+    await env.press("ok")
+    assert await env.store.balance(5) == 37_000
+
+
+async def test_menyuda_boshlangich_narx_dan_korinadi(env):
+    await env.say("/start")
+    text = env.last()
+    assert "4 500 so'm dan" in text and "55 000 so'm dan" in text and "1 500 so'm dan" in text

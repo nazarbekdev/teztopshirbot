@@ -23,7 +23,7 @@ fayl keladi. `ot_live_...` ga o'tishdan oldin hamkor kabinetida kredit sotib oli
 
 ## Narx
 
-Mijoz narxi `app/catalog.py` da. U hamkor narxidan kamida 10% yuqori bo'lishi shart
+Mijoz narxi `app/catalog.py` da. Kichik xizmatlarda (taqdimot, mustaqil ish, referat, test, krossvord) narx asosiy bot uslubida hajmga qarab: boshlang'ich narx eng kichik hajmga, har pog'ona **+1 000 so'm**; kurs ishi 55 / 65 / 75 ming. U hamkor narxidan kamida 10% yuqori bo'lishi shart
 (`tests/test_catalog.py`). Hamkor narxlari: kurs ishi 25 000, taqdimot 3 000, mustaqil ish /
 referat 4 000, test 1 500, krossvord 1 000 (aniq qiymat `/admin` da, `GET /credits` dan).
 

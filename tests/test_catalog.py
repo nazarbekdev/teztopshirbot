@@ -74,7 +74,40 @@ def test_pul_formati_tilga_qarab():
     assert money(55_000, "en") == "55 000 UZS"
 
 
-def test_joriy_narxlar():
+def test_boshlangich_narxlar():
     prices = {slug: SERVICES[slug].min_price for slug in ORDER}
     assert prices == {"taqdimot": 4_500, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
                       "referat": 4_500, "test": 2_500, "krossvord": 1_500}
+
+
+def test_kichik_xizmatlarda_har_pogona_1000_qoshiladi():
+    """Asosiy bot uslubi: hajm bir pog'ona oshsa +1 000 so'm; boshlang'ich narx — eng kichik hajm."""
+    expected = {
+        "taqdimot": {10: 4_500, 15: 5_500, 20: 6_500, 25: 7_500, 30: 8_500},
+        "mustaqil_ish": {10: 4_500, 15: 5_500, 20: 6_500},
+        "referat": {10: 4_500, 15: 5_500, 20: 6_500},
+        "test": {10: 2_500, 15: 3_500, 20: 4_500, 25: 5_500, 30: 6_500},
+        "krossvord": {10: 1_500, 15: 2_500, 20: 3_500, 25: 4_500, 30: 5_500},
+    }
+    for slug, table in expected.items():
+        s = SERVICES[slug]
+        assert s.price == table, slug
+        for size, price in table.items():
+            assert s.price_for({s.price_key: size}) == price
+
+
+def test_tanlov_tugmalarida_narx_korinadi_va_qiymat_son():
+    step = next(st for st in SERVICES["taqdimot"].steps if st.key == "slides")
+    labels = {v: label for v, label in step.choices}
+    assert labels["15"]["uz"] == "15 slayd — 5 500 so'm"
+    assert labels["15"]["ru"] == "15 слайдов — 5 500 сум"
+    assert labels["30"]["en"] == "30 slides — 8 500 UZS"
+    assert step.numeric
+
+
+def test_narx_kaliti_har_tanlov_qiymatiga_mos():
+    for slug in ORDER:
+        s = SERVICES[slug]
+        step = next(st for st in s.steps if st.key == s.price_key)
+        values = {int(v) if step.numeric else v for v, _ in step.choices}
+        assert values == set(s.price), slug

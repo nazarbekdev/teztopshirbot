@@ -51,7 +51,7 @@ class Service:
     note: dict
     eta: dict
     steps: tuple
-    price: int | dict                          # int yoki {pages qiymati: narx}
+    price: int | dict                          # int yoki {hajm qiymati: narx} (hajm kaliti — price_key)
     price_key: str = "pages"
     profile: bool = False                      # titul ma'lumotlari saqlanadi va qayta ishlatiladi
 
@@ -143,7 +143,28 @@ def _count(key: str, uz: str, ru: str, en: str, lbl: tuple, values, **kw) -> Ste
     return Step(key, _d(uz, ru, en), _d(*lbl), kind="choice", choices=_nums(values), numeric=True, **kw)
 
 
-PAGES_SIMPLE = _count("pages", "📄 Necha bet?", "📄 Сколько страниц?", "📄 How many pages?", ("Hajm (bet)", "Объём (стр.)", "Length (pages)"), (10, 15, 20))
+def ladder(base: int, values) -> dict:
+    """Asosiy bot uslubi: har pog'ona +1 000 so'm (birinchi qiymat — boshlang'ich narx)."""
+    return {v: base + 1_000 * i for i, v in enumerate(values)}
+
+
+def _priced(step: Step, prices: dict, unit: tuple) -> Step:
+    """Tanlov tugmalariga narxni qo'shadi: «15 slayd — 5 500 so'm». Qiymat (son) o'zgarmaydi."""
+    choices = tuple(
+        (str(v), _d(*(f"{v} {unit[i]} — {money(prices[int(v)], lang)}" for i, lang in enumerate(("uz", "ru", "en")))))
+        for v, _ in step.choices
+    )
+    return Step(step.key, step.p, step.lbl, kind="choice", choices=choices, numeric=True)
+
+
+SIMPLE_PRICES = ladder(4_500, (10, 15, 20))            # mustaqil ish va referat
+SLIDE_PRICES = ladder(4_500, (10, 15, 20, 25, 30))
+TEST_PRICES = ladder(2_500, (10, 15, 20, 25, 30))
+CROSSWORD_PRICES = ladder(1_500, (10, 15, 20, 25, 30))
+
+PAGES_SIMPLE = _priced(
+    _count("pages", "📄 Necha bet?", "📄 Сколько страниц?", "📄 How many pages?", ("Hajm (bet)", "Объём (стр.)", "Length (pages)"), (10, 15, 20)),
+    SIMPLE_PRICES, ("bet", "стр.", "pages"))
 
 SERVICES: dict[str, Service] = {
     "taqdimot": Service(
@@ -152,13 +173,14 @@ SERVICES: dict[str, Service] = {
         _d("1–3 daqiqa", "1–3 минуты", "1–3 minutes"),
         (
             LANG_STEP, SUBJECT, TOPIC,
-            _count("slides", "🎞 Nechta slayd?", "🎞 Сколько слайдов?", "🎞 How many slides?", ("Slaydlar", "Слайды", "Slides"), (10, 15, 20, 25, 30)),
+            _priced(_count("slides", "🎞 Nechta slayd?", "🎞 Сколько слайдов?", "🎞 How many slides?", ("Slaydlar", "Слайды", "Slides"), (10, 15, 20, 25, 30)),
+                    SLIDE_PRICES, ("slayd", "слайдов", "slides")),
             Step("presenter", _d("👤 Birinchi slaydga <b>ismingizni</b> yozaymi?", "👤 Написать на первом слайде <b>ваше имя</b>?", "👤 Put <b>your name</b> on the first slide?"),
                  _d("Taqdimotchi", "Докладчик", "Presenter"), optional=True, hi=100),
             Step("supervisor", _d("🧑‍🏫 <b>Ilmiy rahbar</b> ismi (ixtiyoriy):", "🧑‍🏫 Имя <b>руководителя</b> (необязательно):", "🧑‍🏫 <b>Supervisor</b> name (optional):"),
                  _d("Rahbar", "Руководитель", "Supervisor"), optional=True, hi=100),
         ),
-        4_500,
+        SLIDE_PRICES, price_key="slides",
     ),
     "kurs_ishi": Service(
         "kurs_ishi", "📖", _d("Kurs ishi", "Курсовая работа", "Coursework"),
@@ -173,30 +195,32 @@ SERVICES: dict[str, Service] = {
         _d("DOCX, 20 betgacha", "DOCX, до 20 стр.", "DOCX, up to 20 pages"),
         _d("2–6 daqiqa", "2–6 минут", "2–6 minutes"),
         (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, SUPERVISOR, SUBJECT, TOPIC, PAGES_SIMPLE),
-        4_500, profile=True,
+        SIMPLE_PRICES, profile=True,
     ),
     "referat": Service(
         "referat", "📄", _d("Referat", "Реферат", "Essay"),
         _d("DOCX, 20 betgacha", "DOCX, до 20 стр.", "DOCX, up to 20 pages"),
         _d("2–6 daqiqa", "2–6 минут", "2–6 minutes"),
         (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, FACULTY, SUPERVISOR, SUBJECT, TOPIC, PAGES_SIMPLE),
-        4_500, profile=True,
+        SIMPLE_PRICES, profile=True,
     ),
     "test": Service(
         "test", "❓", _d("Test", "Тест", "Test"),
         _d("DOCX: savollar va javoblar kaliti", "DOCX: вопросы и ключ ответов", "DOCX: questions and answer key"),
         _d("1–3 daqiqa", "1–3 минуты", "1–3 minutes"),
         (LANG_STEP, SUBJECT, TOPIC_SHORT,
-         _count("questions", "🔢 Nechta savol?", "🔢 Сколько вопросов?", "🔢 How many questions?", ("Savollar", "Вопросы", "Questions"), (10, 15, 20, 25, 30))),
-        2_500,
+         _priced(_count("questions", "🔢 Nechta savol?", "🔢 Сколько вопросов?", "🔢 How many questions?", ("Savollar", "Вопросы", "Questions"), (10, 15, 20, 25, 30)),
+                 TEST_PRICES, ("ta savol", "вопросов", "questions"))),
+        TEST_PRICES, price_key="questions",
     ),
     "krossvord": Service(
         "krossvord", "🧩", _d("Krossvord", "Кроссворд", "Crossword"),
         _d("PDF", "PDF", "PDF"),
         _d("1–2 daqiqa", "1–2 минуты", "1–2 minutes"),
         (LANG_STEP, SUBJECT, TOPIC_SHORT,
-         _count("word_count", "🔢 Nechta so'z?", "🔢 Сколько слов?", "🔢 How many words?", ("So'zlar", "Слова", "Words"), (10, 15, 20, 25, 30))),
-        1_500,
+         _priced(_count("word_count", "🔢 Nechta so'z?", "🔢 Сколько слов?", "🔢 How many words?", ("So'zlar", "Слова", "Words"), (10, 15, 20, 25, 30)),
+                 CROSSWORD_PRICES, ("ta so'z", "слов", "words"))),
+        CROSSWORD_PRICES, price_key="word_count",
     ),
 }
 

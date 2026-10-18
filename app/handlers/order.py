@@ -155,7 +155,8 @@ def _summary(slug: str, answers: dict, lang: str) -> str:
         value = answers.get(step.key)
         if step.kind == "profile" or value in (None, ""):
             continue
-        shown = choice_label(step, value, lang) if step.kind == "choice" else value
+        # Tugmadagi «15 slayd — 5 500 so'm» dan narx qismi olib tashlanadi (narx pastda alohida ko'rsatiladi)
+        shown = choice_label(step, value, lang).split(" — ")[0] if step.kind == "choice" else value
         lines.append(f"• {html.escape(pick(step.lbl, lang))}: <b>{html.escape(str(shown))}</b>")
     return "\n".join(lines)
 
