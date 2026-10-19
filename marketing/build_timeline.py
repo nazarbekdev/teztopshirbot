@@ -8,6 +8,7 @@ Ishlatish:  python build_timeline.py <ishchi_papka>
 
 import asyncio
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -15,7 +16,8 @@ import sys
 import edge_tts
 
 WORK = pathlib.Path(sys.argv[1])
-VOICE, RATE = "uz-UZ-MadinaNeural", "+6%"
+# Ovoz: uz-UZ-MadinaNeural (ayol, standart) yoki uz-UZ-SardorNeural (erkak): VOICE muhit o'zgaruvchisi bilan
+VOICE, RATE = os.environ.get("VOICE", "uz-UZ-MadinaNeural"), os.environ.get("VOICE_RATE", "+6%")
 LEAD, TAIL, MIN_DUR = 0.25, 0.55, 2.8
 
 SCENES = [
