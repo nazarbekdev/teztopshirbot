@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton as IB, Message
 
 from .. import ui
+from ..cleanup import reset, say, sweep, track
 from ..catalog import SERVICES, pick
 from ..i18n import t
 
@@ -30,24 +31,26 @@ def normalize(text: str) -> str:
 @router.message(F.text.in_(ui.PROMO_TEXTS))
 @router.message(Command("promo"))
 async def ask_code(message: Message, state: FSMContext, lang):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     await state.set_state(Promo.code)
-    await message.answer(t(lang, "promo_ask"), parse_mode="HTML",
-                         reply_markup=ui.inline([ui.cancel_button(lang)]))
+    await track(state, message.message_id)            # menyu tugmasi xabari ham tozalanadi
+    await say(message, state, t(lang, "promo_ask"), parse_mode="HTML",
+              reply_markup=ui.inline([ui.cancel_button(lang)]))
 
 
 @router.message(Promo.code, F.text & ~F.text.startswith("/") & ~F.text.in_(ui.MENU_TEXTS))
 async def got_code(message: Message, state: FSMContext, store, lang):
     code = normalize(message.text)
+    await track(state, message.message_id)
     result, voucher = await store.redeem(code, message.from_user.id)
     if result != "ok":
         # Noto'g'ri kodda holat saqlanadi: foydalanuvchi qayta yozishi mumkin (xato harf)
         if result == "invalid":
-            await message.answer(t(lang, ERRORS[result]))
+            await say(message, state, t(lang, ERRORS[result]))
         else:
-            await state.clear()
+            await reset(state, message.bot, message.chat.id)
             await message.answer(t(lang, ERRORS[result]), reply_markup=ui.main_menu(lang))
         return
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     services = "\n".join(f"• {SERVICES[s].emoji} {pick(SERVICES[s].title, lang)}" for s in voucher["services"] if s in SERVICES)
     await message.answer(t(lang, "promo_ok", services=services), parse_mode="HTML", reply_markup=ui.main_menu(lang))

@@ -9,8 +9,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton as IB, Message
 
-from .. import templates_ui, ui
-from .. import casedata
+from .. import casedata, templates_ui, ui
+from ..cleanup import reset, say, sweep, track
 from ..details import SKIP_DETAILS
 from ..api import PartnerError
 from ..catalog import SERVICES, STUDENT_KEYS, build_params, choice_label, is_active, money, pick
@@ -61,8 +61,8 @@ async def _ask(target: Message, state: FSMContext, store, api, lang: str, user_i
             shown = _profile_text(profile, service, lang) if profile else ""
             if shown and "_use_profile" not in answers:
                 await state.update_data(i=i)
-                await target.answer(
-                    t(lang, "profile_found", profile=shown), parse_mode="HTML",
+                await say(
+                    target, state, t(lang, "profile_found", profile=shown), parse_mode="HTML",
                     reply_markup=ui.inline(
                         [IB(text=t(lang, "btn_use_profile"), callback_data="prof:yes", style="success")],
                         [IB(text=t(lang, "btn_new_profile"), callback_data="prof:new")],
@@ -80,9 +80,9 @@ async def _ask(target: Message, state: FSMContext, store, api, lang: str, user_i
             plan = await _make_plan(target, api, lang, answers)
             if plan:
                 await state.update_data(i=i, plan_draft=plan)
-                await _show_plan(target, plan, lang)
+                await _show_plan(target, state, plan, lang)
                 return
-            await target.answer(t(lang, "plan_failed"))
+            await say(target, state, t(lang, "plan_failed"))
             answers = {**answers, step.key: ""}      # worker buyurtma paytida avto-reja tuzadi
             await state.update_data(answers=answers)
             i += 1
@@ -103,17 +103,19 @@ async def _ask(target: Message, state: FSMContext, store, api, lang: str, user_i
         return
     step = service.steps[i]
     first_student = step.target == "student" and (i == 0 or service.steps[i - 1].target != "student")
-    await target.answer(pick(step.p, lang), parse_mode="HTML", reply_markup=_kb(step, lang, first_student))
+    await say(target, state, pick(step.p, lang), parse_mode="HTML", reply_markup=_kb(step, lang, first_student))
 
 
 @router.message(F.text.in_(ui.SERVICE_LABELS))
 async def start_flow(message: Message, state: FSMContext, store, api, lang):
     slug = ui.SERVICE_LABELS[message.text]
     service = SERVICES[slug]
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     await state.set_state(Flow.collecting)
-    await state.update_data(slug=slug, i=0, answers={})
-    await message.answer(
+    # menyu tugmasi xabari ("📊 Taqdimot") ham oqim bilan birga o'chadi
+    await state.update_data(slug=slug, i=0, answers={}, trash=[message.message_id])
+    await say(
+        message, state,
         t(lang, "flow_intro", emoji=service.emoji, title=pick(service.title, lang), price=ui.price_line(slug, lang),
           note=pick(service.note, lang), eta=pick(service.eta, lang)),
         parse_mode="HTML")
@@ -123,6 +125,7 @@ async def start_flow(message: Message, state: FSMContext, store, api, lang):
 async def _advance(target: Message, state: FSMContext, store, api, lang: str, user_id: int, updates: dict) -> None:
     data = await state.get_data()
     await state.update_data(answers={**data["answers"], **updates}, i=data["i"] + 1)
+    await sweep(target.bot, target.chat.id, state)      # javob berilgan savol va foydalanuvchi javobi o'chadi
     await _ask(target, state, store, api, lang, user_id)
 
 
@@ -130,23 +133,24 @@ async def _advance(target: Message, state: FSMContext, store, api, lang: str, us
 async def on_text(message: Message, state: FSMContext, store, api, lang):
     data = await state.get_data()
     step = SERVICES[data["slug"]].steps[data["i"]]
+    await track(state, message.message_id)             # foydalanuvchining javobi ham keyin o'chadi
     if step.kind != "text":
-        await message.answer(t(lang, "pick_button"))
+        await say(message, state, t(lang, "pick_button"))
         return
     if step.key == "case_data":
         cleaned = casedata.clean(message.text)
         if not cleaned:
-            await message.answer(t(lang, "case_invalid"), reply_markup=ui.inline(
+            await say(message, state, t(lang, "case_invalid"), reply_markup=ui.inline(
                 [IB(text=t(lang, "btn_skip"), callback_data="skip")]))
             return
-        await message.answer(t(lang, "case_saved"))
+        await say(message, state, t(lang, "case_saved"))
         await _advance(message, state, store, api, lang, message.from_user.id, {step.key: cleaned})
         return
     text = " ".join((message.text or "").split())
     if step.when == "details" and text.lower() in SKIP_DETAILS:
         text = ""                                      # «-» — umumiy yozilsin
     elif not step.lo <= len(text) <= step.hi:
-        await message.answer(t(lang, "bad_length", lo=step.lo, hi=step.hi, n=len(text)))
+        await say(message, state, t(lang, "bad_length", lo=step.lo, hi=step.hi, n=len(text)))
         return
     await _advance(message, state, store, api, lang, message.from_user.id, {step.key: text})
 
@@ -160,7 +164,7 @@ async def on_choice(callback: CallbackQuery, state: FSMContext, store, api, lang
         await callback.answer(t(lang, "stale_choice"), show_alert=True)
         return
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await track(state, callback.message.message_id)
     await _advance(callback.message, state, store, api, lang, callback.from_user.id,
                    {step.key: int(value) if step.numeric else value})
 
@@ -173,7 +177,7 @@ async def on_skip(callback: CallbackQuery, state: FSMContext, store, api, lang):
         await callback.answer(t(lang, "required"), show_alert=True)
         return
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await track(state, callback.message.message_id)
     updates = {step.key: ""}
     if callback.data == "skipall":
         updates["_skip_student"] = True
@@ -183,7 +187,7 @@ async def on_skip(callback: CallbackQuery, state: FSMContext, store, api, lang):
 @router.callback_query(Flow.collecting, F.data.in_({"prof:yes", "prof:new"}))
 async def on_profile(callback: CallbackQuery, state: FSMContext, store, api, lang):
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await track(state, callback.message.message_id)
     updates: dict = {"_use_profile": callback.data == "prof:yes"}
     if callback.data == "prof:yes":
         updates.update(await store.profile(callback.from_user.id))
@@ -201,11 +205,12 @@ async def _open_templates(target: Message, state: FSMContext, store, api, lang: 
         logger.warning("Shablonlar ro'yxati olinmadi: %s", e)
         return False
     doc_lang = answers.get("language", lang)
-    await target.answer(t(doc_lang, "tpl_select"), parse_mode="HTML")
+    await say(target, state, t(doc_lang, "tpl_select"), parse_mode="HTML")
     message_id = await templates_ui.open_carousel(target, store, api, tpl, doc_lang)
     if message_id is None:
         return False
     await state.update_data(tpl=tpl, tpl_msg=message_id)
+    await track(state, message_id)
     return True
 
 
@@ -242,7 +247,7 @@ async def tpl_select(callback: CallbackQuery, state: FSMContext, store, api, lan
     try:
         await callback.message.delete()                # tanlangach karusel o'chiriladi (asosiy botdagidek)
     except Exception:
-        await callback.message.edit_reply_markup(reply_markup=None)
+        await track(state, callback.message.message_id)
     await _advance(callback.message, state, store, api, lang, callback.from_user.id, {step.key: template_id})
 
 
@@ -274,9 +279,9 @@ async def _make_plan(target: Message, api, lang: str, answers: dict) -> str:
             pass
 
 
-async def _show_plan(target: Message, plan: str, lang: str) -> None:
-    await target.answer(t(lang, "plan_view") + f"<pre>{html.escape(plan[:3000])}</pre>", parse_mode="HTML",
-                        reply_markup=_plan_kb(lang))
+async def _show_plan(target: Message, state: FSMContext, plan: str, lang: str) -> None:
+    await say(target, state, t(lang, "plan_view") + f"<pre>{html.escape(plan[:3000])}</pre>", parse_mode="HTML",
+              reply_markup=_plan_kb(lang))
 
 
 async def _current_step(state: FSMContext):
@@ -291,7 +296,7 @@ async def plan_ok(callback: CallbackQuery, state: FSMContext, store, api, lang):
         await callback.answer(t(lang, "tpl_stale"), show_alert=True)
         return
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await track(state, callback.message.message_id)
     await _advance(callback.message, state, store, api, lang, callback.from_user.id, {step.key: data["plan_draft"]})
 
 
@@ -304,11 +309,12 @@ async def plan_regen(callback: CallbackQuery, state: FSMContext, store, api, lan
     await callback.answer()
     plan = await _make_plan(callback.message, api, lang, data["answers"])
     if not plan:
-        await callback.message.answer(t(lang, "plan_busy"))
+        await say(callback.message, state, t(lang, "plan_busy"))
         return
     await state.update_data(plan_draft=plan)
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await _show_plan(callback.message, plan, lang)
+    await track(state, callback.message.message_id)    # eski reja o'chadi, yangisi ko'rsatiladi
+    await sweep(callback.message.bot, callback.message.chat.id, state)
+    await _show_plan(callback.message, state, plan, lang)
 
 
 @router.callback_query(Flow.collecting, F.data == "case:open")
@@ -318,7 +324,7 @@ async def case_open(callback: CallbackQuery, state: FSMContext, store, api, lang
         await callback.answer(t(lang, "tpl_stale"), show_alert=True)
         return
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await track(state, callback.message.message_id)
     await _advance(callback.message, state, store, api, lang, callback.from_user.id,
                    {"extra_instructions": "", "_case": True})
 
@@ -363,21 +369,21 @@ async def _confirm(target: Message, state: FSMContext, store, lang: str, user_id
         text += t(lang, "short_by", need=money(need, lang))
         kb = ui.inline(*free, [IB(text=t(lang, "btn_topup_short"), callback_data=f"topup:{need}", style="primary")],
                        [ui.cancel_button(lang)])
-    await target.answer(text, parse_mode="HTML", reply_markup=kb)
+    await say(target, state, text, parse_mode="HTML", reply_markup=kb)
 
 
 @router.callback_query(Flow.confirming, F.data == "ok")
 async def on_ok(callback: CallbackQuery, state: FSMContext, store, settings, lang):
     data = await state.get_data()
     # Holatni darhol tozalaymiz: ikki marta bosilgan tugma ikkinchi buyurtma yaratmasin.
-    await state.clear()
+    await track(state, callback.message.message_id)
+    await reset(state, callback.bot, callback.message.chat.id)      # oraliq xabarlar o'chadi, natija qoladi
     slug = data["slug"]
     service = SERVICES[slug]
     uid = callback.from_user.id
     result = await store.place_order(uid, slug, build_params(service, data["answers"]),
                                      service.price_for(data["answers"]), max_active=settings.per_user_active)
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
     if result == "limit":
         await callback.message.answer(t(lang, "too_many_active", n=settings.per_user_active))
         return
@@ -395,13 +401,13 @@ async def on_ok(callback: CallbackQuery, state: FSMContext, store, settings, lan
 @router.callback_query(Flow.confirming, F.data == "free")
 async def on_free(callback: CallbackQuery, state: FSMContext, store, settings, lang):
     data = await state.get_data()
-    await state.clear()
+    await track(state, callback.message.message_id)
+    await reset(state, callback.bot, callback.message.chat.id)
     slug = data["slug"]
     service = SERVICES[slug]
     uid = callback.from_user.id
     voucher = await store.active_voucher(uid)
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
     if not voucher or slug not in voucher["services"]:
         await callback.message.answer(t(lang, "free_gone"))
         return
@@ -423,7 +429,7 @@ async def on_free(callback: CallbackQuery, state: FSMContext, store, settings, l
 
 @router.callback_query(F.data == "cancel")
 async def on_cancel(callback: CallbackQuery, state: FSMContext, lang):
-    await state.clear()
+    await track(state, callback.message.message_id)
+    await reset(state, callback.bot, callback.message.chat.id)
     await callback.answer(t(lang, "cancelled_toast"))
-    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(t(lang, "cancelled"), reply_markup=ui.main_menu(lang))

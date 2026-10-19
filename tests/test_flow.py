@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import EditMessageMedia, GetChatMember, SendDocument, SendMessage, SendPhoto
+from aiogram.methods import (DeleteMessage, DeleteMessages, EditMessageMedia, GetChatMember, SendDocument,
+                             SendMessage, SendPhoto)
 from aiogram.types import CallbackQuery, Chat, ChatMemberLeft, ChatMemberMember, Message, PhotoSize, Update, User
 
 from app import subscription
@@ -27,6 +28,8 @@ class FakeSession(BaseSession):
         self.calls = []
         self.members: set[int] = set()
         self.member_error = False
+        self.deleted: set[int] = set()
+        self.sent: dict[int, str] = {}          # bot yuborgan xabar ID → matn (yoki "<photo>")
 
     async def close(self):
         pass
@@ -42,14 +45,26 @@ class FakeSession(BaseSession):
             user = User(id=method.user_id, is_bot=False, first_name="u")
             return (ChatMemberMember(user=user) if method.user_id in self.members
                     else ChatMemberLeft(user=user))
+        if isinstance(method, DeleteMessages):
+            self.deleted.update(method.message_ids)
+            return True
+        if isinstance(method, DeleteMessage):
+            self.deleted.add(method.message_id)
+            return True
         if isinstance(method, (SendPhoto, EditMessageMedia)):
             chat_id = getattr(method, "chat_id", 0) or 0
+            self.sent[len(self.calls)] = "<photo>"
             return Message(message_id=len(self.calls), date=datetime.datetime.now(), chat=Chat(id=chat_id, type="private"),
                            photo=[PhotoSize(file_id=f"tgphoto{len(self.calls)}", file_unique_id="u", width=1, height=1)])
         if isinstance(method, (SendMessage, SendDocument)):
+            self.sent[len(self.calls)] = getattr(method, "text", None) or "<document>"
             return Message(message_id=len(self.calls), date=datetime.datetime.now(),
                            chat=Chat(id=method.chat_id, type="private"), text=getattr(method, "text", None))
         return True
+
+    def alive(self) -> list[str]:
+        """Chatda hozir turgan bot xabarlari (o'chirilmaganlari), yuborilish tartibida."""
+        return [text for mid, text in self.sent.items() if mid not in self.deleted]
 
     def texts(self, chat_id=None):
         return [m.text for m in self.calls if isinstance(m, SendMessage) and (chat_id is None or m.chat_id == chat_id)]

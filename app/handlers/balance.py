@@ -8,6 +8,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton as IB, Message
 
 from .. import payments, ui
+from ..cleanup import reset, say, sweep, track
 from ..catalog import money
 from ..i18n import t
 
@@ -37,7 +38,7 @@ def _amount_kb(lang: str):
 
 @router.message(F.text.in_(ui.BALANCE_TEXTS))
 async def show_balance(message: Message, state: FSMContext, store, lang):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     balance = await store.balance(message.from_user.id)
     note = t(lang, "voucher_note") if await store.active_voucher(message.from_user.id) else ""
     await message.answer(
@@ -47,36 +48,41 @@ async def show_balance(message: Message, state: FSMContext, store, lang):
 
 @router.callback_query(F.data.startswith("topup:"))
 async def topup_start(callback: CallbackQuery, state: FSMContext, lang):
-    await state.clear()
+    await reset(state, callback.bot, callback.message.chat.id)
     await callback.answer()
     need = int(callback.data.split(":")[1])
     hint = t(lang, "topup_hint", need=money(need, lang)) if need else ""
-    await callback.message.answer(t(lang, "topup_howmuch", hint=hint), parse_mode="HTML", reply_markup=_amount_kb(lang))
+    await say(callback.message, state, t(lang, "topup_howmuch", hint=hint), parse_mode="HTML",
+              reply_markup=_amount_kb(lang))
 
 
 @router.callback_query(F.data.startswith("ta:"))
 async def topup_amount(callback: CallbackQuery, state: FSMContext, settings, lang):
     value = callback.data[3:]
     await callback.answer()
+    await track(state, callback.message.message_id)
+    await sweep(callback.bot, callback.message.chat.id, state)
     if value == "other":
         await state.set_state(Topup.amount)
-        await callback.message.answer(t(lang, "type_amount", lo=money(MIN_TOPUP, lang), hi=money(MAX_TOPUP, lang)))
+        await say(callback.message, state, t(lang, "type_amount", lo=money(MIN_TOPUP, lang), hi=money(MAX_TOPUP, lang)))
         return
-    await _choose_method(callback.message, int(value), settings, lang)
+    await _choose_method(callback.message, state, int(value), settings, lang)
 
 
 @router.message(Topup.amount, F.text & ~F.text.in_(ui.MENU_TEXTS) & ~F.text.startswith("/"))
 async def topup_custom(message: Message, state: FSMContext, settings, lang):
+    await track(state, message.message_id)
     digits = "".join(ch for ch in message.text if ch.isdigit())
     amount = int(digits) if digits else 0
     if not MIN_TOPUP <= amount <= MAX_TOPUP:
-        await message.answer(t(lang, "amount_range", lo=money(MIN_TOPUP, lang), hi=money(MAX_TOPUP, lang)))
+        await say(message, state, t(lang, "amount_range", lo=money(MIN_TOPUP, lang), hi=money(MAX_TOPUP, lang)))
         return
-    await state.clear()
-    await _choose_method(message, amount, settings, lang)
+    await sweep(message.bot, message.chat.id, state)
+    await state.set_state(None)
+    await _choose_method(message, state, amount, settings, lang)
 
 
-async def _choose_method(target: Message, amount: int, settings, lang: str) -> None:
+async def _choose_method(target: Message, state: FSMContext, amount: int, settings, lang: str) -> None:
     rows = []
     if settings.click_enabled:
         rows.append([IB(text=t(lang, "btn_click"), callback_data=f"pm:click:{amount}", style="primary")])
@@ -86,8 +92,8 @@ async def _choose_method(target: Message, amount: int, settings, lang: str) -> N
         await target.answer(t(lang, "no_methods"))
         return
     rows.append([ui.cancel_button(lang)])
-    await target.answer(t(lang, "choose_method", amount=money(amount, lang)), parse_mode="HTML",
-                        reply_markup=ui.inline(*rows))
+    await say(target, state, t(lang, "choose_method", amount=money(amount, lang)), parse_mode="HTML",
+              reply_markup=ui.inline(*rows))
 
 
 @router.callback_query(F.data.startswith("pm:"))
@@ -95,6 +101,8 @@ async def method_chosen(callback: CallbackQuery, state: FSMContext, store, setti
     _, method, raw = callback.data.split(":")
     amount = int(raw)
     await callback.answer()
+    await track(state, callback.message.message_id)
+    await sweep(callback.bot, callback.message.chat.id, state)
     if not MIN_TOPUP <= amount <= MAX_TOPUP:
         return
     if method == "click" and settings.click_enabled:
@@ -108,7 +116,8 @@ async def method_chosen(callback: CallbackQuery, state: FSMContext, store, setti
         await state.set_state(Topup.receipt)
         await state.update_data(amount=amount)
         holder = t(lang, "card_holder", name=settings.card_holder) if settings.card_holder else ""
-        await callback.message.answer(
+        await say(
+            callback.message, state,
             t(lang, "card_screen", amount=money(amount, lang), card=settings.card_number, holder=holder),
             parse_mode="HTML", reply_markup=ui.inline([ui.cancel_button(lang)]))
 
@@ -131,7 +140,8 @@ def card_markup(pid: int):
 @router.message(Topup.receipt, F.photo)
 async def receipt_photo(message: Message, state: FSMContext, store, notify_admins, lang):
     data = await state.get_data()
-    await state.clear()
+    await track(state, message.message_id)             # karta ko'rsatmasi va chek rasmi chatdan o'chadi
+    await reset(state, message.bot, message.chat.id)
     pid = await store.new_payment(message.from_user.id, data["amount"], "card", "pending", message.photo[-1].file_id)
     await message.answer(t(lang, "receipt_ok"), reply_markup=ui.main_menu(lang))
     payment, user = await store.payment(pid), await store.user(message.from_user.id)
@@ -139,8 +149,9 @@ async def receipt_photo(message: Message, state: FSMContext, store, notify_admin
 
 
 @router.message(Topup.receipt)
-async def receipt_not_photo(message: Message, lang):
-    await message.answer(t(lang, "receipt_not_photo"), parse_mode="HTML")
+async def receipt_not_photo(message: Message, state: FSMContext, lang):
+    await track(state, message.message_id)
+    await say(message, state, t(lang, "receipt_not_photo"), parse_mode="HTML")
 
 
 # ── admin: tasdiqlash / rad etish / summani tahrirlash ───────────────────

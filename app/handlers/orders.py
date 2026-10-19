@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton as IB, Message
 
 from .. import ui
+from ..cleanup import reset
 from ..api import PartnerError
 from ..catalog import SERVICES, pick
 from ..i18n import t
@@ -18,7 +19,7 @@ router = Router()
 
 @router.message(F.text.in_(ui.ORDERS_TEXTS))
 async def my_orders(message: Message, state: FSMContext, store, lang):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     rows = await store.user_orders(message.from_user.id)
     if not rows:
         await message.answer(t(lang, "no_orders"))

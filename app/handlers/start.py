@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from .. import subscription, ui
+from ..cleanup import drop, reset
 from ..catalog import ORDER, SERVICES, pick
 from ..i18n import LANGS, t
 
@@ -27,7 +28,7 @@ async def show_menu(message: Message, user_name: str, lang: str) -> None:
 
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext, store, settings, alert, lang):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     if not lang:
         await message.answer(t(None, "lang_prompt"), reply_markup=ui.lang_keyboard())
         return
@@ -44,7 +45,7 @@ async def start(message: Message, state: FSMContext, store, settings, alert, lan
 
 @router.message(F.text.in_(ui.LANG_TEXTS))
 async def change_lang(message: Message, state: FSMContext):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     await message.answer(t(None, "lang_prompt"), reply_markup=ui.lang_keyboard())
 
 
@@ -54,10 +55,10 @@ async def lang_chosen(callback: CallbackQuery, state: FSMContext, store, setting
     if code not in LANGS:
         await callback.answer()
         return
-    await state.clear()
+    await reset(state, callback.bot, callback.message.chat.id)
     await store.set_lang(callback.from_user.id, code)
     await callback.answer(t(code, "lang_changed"))
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await drop(callback.message)                  # til tanlash xabari o'chadi
     user = await store.user(callback.from_user.id)
     if user.get("consent_version") != ui.CONSENT_VERSION:
         await callback.message.answer(t(code, "consent_intro"), parse_mode="HTML", reply_markup=ui.consent_keyboard(code))
@@ -81,7 +82,7 @@ async def sub_check(callback: CallbackQuery, store, settings, alert):
         await callback.answer(t(lang, "not_member"), show_alert=True)
         return
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await drop(callback.message)
     await show_menu(callback.message, callback.from_user.full_name, lang)
 
 
@@ -98,7 +99,7 @@ async def consent_yes(callback: CallbackQuery, store, settings, alert):
     lang = (await store.user(callback.from_user.id)).get("lang") or "uz"
     await store.accept_consent(callback.from_user.id, ui.CONSENT_VERSION)
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await drop(callback.message)
     if not await subscription.is_member(callback.bot, settings, callback.from_user.id, alert):
         await callback.message.answer(t(lang, "sub_required"), parse_mode="HTML",
                                       reply_markup=ui.subscribe_keyboard(lang, settings.required_channel))
@@ -117,12 +118,12 @@ async def privacy(message: Message, store, settings, lang):
 
 @router.message(Command("menu"))
 async def menu(message: Message, state: FSMContext, lang):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     await message.answer(t(lang, "menu_home"), reply_markup=ui.main_menu(lang))
 
 
 @router.message(F.text.in_(ui.HELP_TEXTS))
 @router.message(Command("help"))
 async def help_(message: Message, state: FSMContext, settings, lang):
-    await state.clear()
+    await reset(state, message.bot, message.chat.id)
     await message.answer(t(lang, "help", contact=contact_of(settings, lang)), parse_mode="HTML")
