@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8">
+<style>
+:root{--blue:#3FA9FF;--green:#3DDC97;--amber:#FFC24B;--red:#FF5C6C;--ink:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#0b1230;font-family:"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+#bg{position:absolute;inset:0;background:radial-gradient(1200px 1200px at 50% 14%,#1d3a8a 0%,#0b1230 62%)}
+#glow{position:absolute;left:-200px;top:-200px;width:1500px;height:1500px;border-radius:50%;filter:blur(120px);opacity:.3;background:radial-gradient(circle,#3FA9FF,transparent 65%)}
+.float{position:absolute;font-size:64px;opacity:.14}
+#hookwrap{position:absolute;left:0;right:0;top:120px;text-align:center}
+#hookbadge{display:inline-block;padding:20px 46px;border-radius:99px;background:rgba(255,92,108,.16);border:2px solid var(--red);font-size:46px;font-weight:800}
+#clockicon{font-size:64px;margin-right:12px}
+/* chat phone */
+#phone{position:absolute;left:90px;right:90px;top:300px;bottom:360px;border-radius:70px;background:#0e1621;border:8px solid #233049;box-shadow:0 40px 140px rgba(0,0,0,.55);overflow:hidden}
+#phead{height:150px;background:#17212b;display:flex;align-items:center;gap:26px;padding:0 44px;border-bottom:2px solid #223142}
+#phead .av{width:92px;height:92px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#1D5BD6);display:flex;align-items:center;justify-content:center;font-size:52px}
+#phead .nm{font-size:48px;font-weight:800}
+#phead .st{font-size:30px;color:var(--green);font-weight:700}
+#stack{position:absolute;left:36px;right:36px;top:170px;bottom:30px;transition:none}
+#stack{overflow:visible}
+.msg{position:absolute;max-width:76%;padding:28px 34px;border-radius:40px;font-size:42px;font-weight:600;line-height:1.3;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+.msg.me{right:0;background:linear-gradient(135deg,#2b5278,#3a6a9c);border-bottom-right-radius:14px}
+.msg.them{left:0;background:#182533;border-bottom-left-radius:14px}
+.msg .nm2{display:block;font-size:28px;font-weight:800;opacity:.75;margin-bottom:6px}
+#typing{position:absolute;left:0;padding:24px 32px;border-radius:40px;background:#182533;border-bottom-left-radius:14px}
+#typing span{display:inline-block;width:16px;height:16px;border-radius:50%;background:#7a8aa3;margin:0 5px}
+/* demo card inside chat */
+.demoCard{position:absolute;max-width:84%;left:0;border-radius:40px;background:#182533;border-bottom-left-radius:14px;padding:30px 34px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+.demoCard .nm2{display:block;font-size:28px;font-weight:800;opacity:.75;margin-bottom:10px}
+.demoCard .line{font-size:40px;font-weight:700;margin-bottom:14px}
+.bar{height:20px;border-radius:12px;background:#263648;overflow:hidden;margin:12px 0}
+.bar>div{height:100%;background:linear-gradient(90deg,var(--blue),var(--green))}
+.filebox{display:flex;align-items:center;gap:22px;margin-top:8px}
+.filebox .ic{width:84px;height:84px;border-radius:22px;background:linear-gradient(135deg,#2f8fe8,#1D5BD6);display:flex;align-items:center;justify-content:center;font-size:46px}
+.filebox b{font-size:36px}
+.filebox small{display:block;font-size:28px;opacity:.7}
+/* price bump */
+#pricebadge{position:absolute;left:0;right:0;text-align:center;top:1620px;font-weight:900;font-size:0}
+#pricebadge .num{font-size:100px;color:var(--amber);text-shadow:0 0 50px rgba(255,194,75,.5)}
+#pricebadge .lbl{font-size:44px;display:block}
+/* promo fullscreen */
+.scene{position:absolute;inset:0;opacity:0;pointer-events:none}
+#s_promo{display:flex;flex-direction:column;align-items:center}
+#gift{font-size:320px;margin-top:220px}
+#ptitle{font-size:66px;font-weight:900;margin-top:20px}
+#coupon{margin-top:50px;padding:34px 70px;border-radius:56px;border:8px dashed var(--amber);background:rgba(255,194,75,.1);position:relative;overflow:hidden}
+#code{font-size:144px;font-weight:900;letter-spacing:6px;color:var(--amber);text-shadow:0 0 50px rgba(255,194,75,.5)}
+#shine{position:absolute;top:0;bottom:0;width:180px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg)}
+#pnote{font-size:52px;font-weight:800;text-align:center;margin-top:46px;padding:0 90px;line-height:1.3}
+#pexcl{font-size:34px;opacity:.75;margin-top:18px;text-align:center}
+#cta{margin-top:70px;padding:0 80px;height:190px;border-radius:99px;background:linear-gradient(90deg,var(--blue),#1D5BD6);font-size:72px;font-weight:900;line-height:190px;box-shadow:0 20px 80px rgba(63,169,255,.5)}
+#foot{position:absolute;left:80px;right:80px;bottom:30px;text-align:center;font-size:28px;opacity:.6;line-height:1.35}
+#caps{position:absolute;left:60px;right:60px;top:1670px;height:230px;text-align:center;font-size:62px;font-weight:900;line-height:1.14;text-shadow:0 6px 26px rgba(0,0,0,.65)}
+#caps span{display:inline-block;margin:0 8px}
+#caps .on{color:var(--amber);transform:scale(1.07)}
+#brandbar{position:absolute;left:0;right:0;bottom:60px;text-align:center;font-size:36px;font-weight:700;opacity:.9}
+</style></head>
+<body>
+<div id="bg"></div><div id="glow"></div><div id="floats"></div>
+<div id="hookwrap"><span id="hookbadge"><span id="clockicon">⏰</span>Sessiya kechasi 23:40</span></div>
+<div id="phone">
+  <div id="phead"><div class="av">🎓</div><div><div class="nm">Tez Topshir</div><div class="st">online</div></div></div>
+  <div id="stack"></div>
+</div>
+<div id="pricebadge"><span class="num" id="pricenum"></span><span class="lbl">so'mdan</span></div>
+
+<div class="scene" id="s_promo">
+  <div id="gift">🎁</div>
+  <div id="ptitle">PROMOKOD</div>
+  <div id="coupon"><div id="code"></div><div id="shine"></div></div>
+  <div id="pnote">Birinchi <span style="color:var(--green)">300 ta</span> foydalanuvchiga istalgan <span style="color:var(--amber)">1 ta xizmat BEPUL</span></div>
+  <div id="pexcl">* Kurs ishi aksiyaga kirmaydi</div>
+  <div id="cta">@teztopshirbot</div>
+  <div id="foot">Hujjat sun'iy intellekt yordamida tayyorlanadi — topshirishdan oldin o'zingiz tekshiring.</div>
+</div>
+<div id="caps"></div>
+<div id="brandbar">Telegram: @teztopshirbot</div>
+
+<script>
+const TL=/*TIMELINE*/null;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo3=p=>1-Math.pow(1-clamp(p),3);
+const eob=p=>{p=clamp(p);const c1=1.9,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const $=id=>document.getElementById(id);
+const scenes=TL.scenes;
+const S=n=>scenes.find(s=>s.name===n);
+const promoScene=S('promo'), demoScene=S('demo');
+const fl=$('floats');const icons=['📚','🎓','✏️','📄','📊','🧩','💡','⏰'];
+const floats=[...Array(12)].map((_,i)=>{const e=document.createElement('div');e.className='float';e.textContent=icons[i%icons.length];fl.appendChild(e);return{e,x:(i*191)%1000,y0:(i*331)%2100,s:0.5+((i*7)%5)/6,ph:i*1.4}});
+
+// Chat elementlari — SCENES tartibida, bitta ustunga ketma-ket joylanadi (real balandlik bilan o'lchanadi)
+const chatScenes = scenes.filter(s => s.kind === 'bubble_T' || s.kind === 'bubble_D' || s.kind === 'demo');
+const items = [];
+chatScenes.forEach(s => {
+  let el;
+  if (s.kind === 'demo') {
+    el = document.createElement('div'); el.className = 'demoCard';
+    el.innerHTML = `<span class="nm2">Tez Topshir</span><div class="line" id="dmLine">Mavzu: Raqamli iqtisodiyot</div><div class="bar"><div id="dmBar" style="width:0%"></div></div><div class="filebox" id="dmFile" style="opacity:0"><div class="ic">📖</div><div><b>KursIshi.docx</b><small>55 bet · DOCX</small></div></div>`;
+  } else {
+    el = document.createElement('div'); el.className = 'msg ' + (s.speaker === 'T' ? 'me' : 'them');
+    el.innerHTML = `<span class="nm2">${s.speaker === 'T' ? 'Siz' : 'Diyora'}</span>${s.text}`;
+  }
+  el.style.opacity = '0';
+  $('stack').appendChild(el);
+  items.push({ s, el });
+});
+// Joylashuv: real balandlik bilan ketma-ket (layout tugagach o'lchanadi)
+let cursorTop = 10;
+items.forEach(it => {
+  it.el.style.top = cursorTop + 'px';
+  it.top = cursorTop;
+  cursorTop += it.el.offsetHeight + 34;
+  it.bottom = cursorTop - 34;
+});
+const stackInnerHeight = $('phone').offsetHeight - 170 - 30; // #phead balandligi va pastki bo'shliq
+const demoEl = items.find(it => it.s.kind === 'demo').el;
+const demoScene2 = items.find(it => it.s.kind === 'demo').s;
+
+function setCaps(t){
+  const caps=$('caps');
+  if(t<promoScene.start) {caps.innerHTML='';return}
+  const lt=t-promoScene.start, ws=promoScene.words;
+  const groups=[];for(let i=0;i<ws.length;i+=3)groups.push(ws.slice(i,i+3));
+  const g=groups.find(g=>lt>=g[0].t0-0.05&&lt<=g[g.length-1].t1+0.35);
+  if(!g){caps.innerHTML='';return}
+  const key=g[0].t0;if(caps.dataset.k!=key){caps.dataset.k=key;caps.innerHTML=g.map((w,i)=>`<span>${w.text}</span>`).join(' ')}
+  [...caps.children].forEach((sp,i)=>{sp.className=(lt>=g[i].t0&&lt<=g[i].t1+0.05)?'on':''});
+  caps.style.opacity=clamp((lt-(g[0].t0-0.05))/0.18);
+}
+
+function render(t){
+  $('glow').style.transform=`translate(${Math.sin(t*0.5)*120}px,${Math.cos(t*0.4)*150}px)`;
+  floats.forEach(f=>{const y=(f.y0-t*55*f.s)%2200;f.e.style.transform=`translate(${f.x+Math.sin(t*0.7+f.ph)*45}px,${(y<0?y+2200:y)-100}px) scale(${f.s}) rotate(${Math.sin(t+f.ph)*12}deg)`});
+
+  const inPromo = t>=promoScene.start-0.3;
+  const phoneT = clamp((promoScene.start-0.25-t)/0.3);
+  $('phone').style.opacity = inPromo? clamp(phoneT*3):1;
+  $('pricebadge').style.opacity = $('phone').style.opacity;
+  $('hookwrap').style.opacity = clamp(Math.min(t/0.4, (4.0-t)/0.4,1))* (inPromo?0:1);
+
+  // har bir chat elementi: paydo bo'lishi + avtomatik aylantirish (eng so'nggisi ko'rinadi)
+  let activeBottom = 0;
+  items.forEach(it=>{
+    const appearAt = it.s.start + 0.08;
+    const p = (t-appearAt)/0.4;
+    const op = clamp(p*3);
+    it.el.style.opacity = op;
+    it.el.style.transform = `translateY(${(1-eob(p))*30}px) scale(${0.86+0.14*eob(p)})`;
+    if (op > 0.05) activeBottom = it.bottom;
+  });
+  const targetScroll = Math.max(0, activeBottom - stackInnerHeight);
+  $('stack').style.transform = `translateY(${-targetScroll}px)`;
+  // demo card ichidagi animatsiya
+  {const lt=t-demoScene2.start, p=clamp((lt-0.05)/0.4);
+   const prog=clamp((lt-0.5)/1.6);$('dmBar').style.width=(prog*100)+'%';
+   $('dmFile').style.opacity=clamp((lt-2.2)/0.4);}
+  // narx raqami sanab chiqadi (explain sahnasida)
+  {const ex=S('explain'), lt=t-ex.start;
+   if(t>=ex.start+1.8 && t<promoScene.start-0.3){
+     const n=Math.round(55000*eo3(clamp((lt-2.2)/1.0)));
+     $('pricenum').textContent=n?String(n).replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';
+   }}
+
+  // promo fullscreen
+  const ps=$('s_promo'), lt=t-promoScene.start;
+  ps.style.opacity = inPromo? clamp((lt+0.1)/0.4):0;
+  ps.style.pointerEvents='none';
+  if(inPromo){
+    const e=promoScene.events;
+    $('gift').style.transform=`scale(${eob(lt/0.6)}) rotate(${Math.sin(lt*6)*5*clamp(1.3-lt)}deg)`;
+    const cp=(lt-e.coupon-0.1)/0.6;$('coupon').style.opacity=clamp(cp*3);$('coupon').style.transform=`scale(${0.7+0.3*eob(cp)})`;
+    const letters='TEZSTART';const shown=Math.floor(letters.length*clamp((lt-e.coupon)/0.7));$('code').textContent=letters.slice(0,shown);
+    $('shine').style.left=(-300+((lt-e.coupon-0.8)*900)%1500)+'px';
+    $('pnote').style.opacity=clamp((lt-e.coupon-0.3)/0.4);
+    $('pexcl').style.opacity=clamp((lt-e.note)/0.4);
+    const ctp=(lt-e.note-0.3)/0.5;$('cta').style.opacity=clamp(ctp*3);$('cta').style.transform=`scale(${0.8+0.2*eob(ctp)})`;
+    $('foot').style.opacity=clamp((lt-e.note-0.5)/0.5)*0.9;
+  }
+  $('brandbar').style.opacity = inPromo? 0 : (t>2.5?0.85:0);
+  setCaps(t);
+}
+window.render=render;
+</script></body></html>

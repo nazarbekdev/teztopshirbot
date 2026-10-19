@@ -50,3 +50,27 @@ Instagram'da "reelsni nishonga olish" — ikki yo'l: (A) organik: auditoriya qae
 ## O'lchash (keyingi qadam)
 Hozir bot `/start` manbasini (qaysi reel/reklama) yozib bormaydi. Havola `t.me/teztopshirbot?start=ig_reel1` shaklida bo'lsa,
 botga «birinchi marta qaerdan kelgan» belgisini qo'shish mumkin (asosiy botdagi reklama-manba tizimi kabi).
+
+## 2-reel: "Sessiya kechasi 23:40" (kurs ishi, chat hikoya)
+`out/teztopshir-reel2-kursishi.mp4` — 36 s. Ikki ovoz (talaba=Sardor, do'st=Madina), Telegram uslubidagi avtomatik aylanadigan
+yozishma, kurs ishi narxi (55 000 so'mdan) va promokod (kurs ishi bundan mustasno). Qayta yig'ish: `./make_reel2.sh`.
+
+### Caption (kurs ishi uchun)
+```
+"Ertaga kurs ishi topshirishim kerak, hali boshlamadim!" 😭
+
+Tanish holatmi? Tez Topshir boti yordam beradi:
+📖 Kurs ishi — 55 000 so'mdan
+📊 Taqdimot · 📝 Mustaqil ish · 📄 Referat · ❓ Test · 🧩 Krossvord — 1 500 so'mdan
+
+Mavzuni yozasiz, bir necha daqiqada tayyor fayl o'zingizga keladi.
+
+🎁 Promokod: TEZSTART — birinchi 300 foydalanuvchiga istalgan 1 ta xizmat BEPUL
+(kurs ishi bundan mustasno)
+
+👉 Telegram: @teztopshirbot
+
+⚠️ Hujjat sun'iy intellekt yordamida tayyorlanadi. Topshirishdan oldin o'zingiz tekshiring.
+
+#talaba #kursishi #sessiya #universitet #oliygoh #talabahayoti #uzbekistan #toshkent #deadline #tezTopshir
+```
