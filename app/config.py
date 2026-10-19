@@ -34,6 +34,7 @@ class Settings:
     panel_url: str = field(default_factory=lambda: os.getenv("PANEL_URL", "").rstrip("/"))
     required_channel: str = field(default_factory=lambda: os.getenv("REQUIRED_CHANNEL", "").strip())
     channel_check_admins: bool = field(default_factory=lambda: os.getenv("CHANNEL_CHECK_ADMINS", "0") == "1")
+    orders_log_channel: str = field(default_factory=lambda: os.getenv("ORDERS_LOG_CHANNEL", "").strip())
     db_path: str = field(default_factory=lambda: os.getenv("DB_PATH", "teztopshir.db"))
     support_username: str = field(default_factory=lambda: os.getenv("SUPPORT_USERNAME", "").lstrip("@"))
     max_active: int = field(default_factory=lambda: int(os.getenv("MAX_ACTIVE_ORDERS", "80")))

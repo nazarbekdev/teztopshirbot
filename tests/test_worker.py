@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -10,12 +11,18 @@ from app.worker import Worker
 class FakeBot:
     def __init__(self):
         self.messages, self.documents = [], []
+        self.channel_docs, self.channel_captions = [], []
 
     async def send_message(self, chat_id, text, **kw):
         self.messages.append((chat_id, text))
 
     async def send_document(self, chat_id, document, caption=None, **kw):
+        if isinstance(document, str):                  # kanalga file_id qayta ishlatilgan holat
+            self.channel_docs.append((chat_id, document))
+            self.channel_captions.append(caption)
+            return SimpleNamespace(document=SimpleNamespace(file_id=document))
         self.documents.append((chat_id, document.filename, caption))
+        return SimpleNamespace(document=SimpleNamespace(file_id=f"tgfile_{document.filename}"))
 
 
 def make(handler):
@@ -190,3 +197,69 @@ async def test_xabarlar_foydalanuvchi_tilida(store):
     await place(store)
     await Worker(store, api, bot, 80, alert).tick()
     assert "временно недоступна" in bot.messages[-1][1]
+
+
+async def test_arxiv_kanaliga_file_id_bilan_yuboriladi_qayta_yuklanmaydi(store):
+    downloads = []
+
+    def handler(request):
+        if request.method == "POST":
+            return httpx.Response(202, json={"id": "ord_a", "status": "queued"})
+        if request.url.path.endswith("/orders"):
+            return httpx.Response(200, json={"data": []})
+        if request.url.path.endswith("/orders/ord_a"):
+            return httpx.Response(200, json={"id": "ord_a", "status": "succeeded",
+                                             "result": {"files": [{"id": "fil_a", "name": "a.docx"}]}})
+        downloads.append(1)
+        return httpx.Response(200, content=b"DOC")
+
+    api, alerts, alert = make(handler)
+    bot = FakeBot()
+    await store.touch_user(1, "Ali", "ali_u")
+    oid = await place(store, service="referat", price=4_500)
+    w = Worker(store, api, bot, 8, alert, log_channel="-100999")
+    w.poll_every = 0
+    await w.tick()
+    await w.tick()
+    assert bot.channel_docs == [("-100999", "tgfile_a.docx")]
+    assert "Ali" in bot.channel_captions[0] and "ali_u" in bot.channel_captions[0] and "4 500" in bot.channel_captions[0]
+    assert len(downloads) == 1                        # faylni faqat BIR marta yuklab oldi (mijozga)
+
+
+async def test_arxiv_sozlanmagan_bolsa_hech_narsa_yuborilmaydi(store):
+    api, alerts, alert = make(lambda r: httpx.Response(202, json={"id": "x", "status": "queued"})
+                               if r.method == "POST" else httpx.Response(200, json={"status": "succeeded",
+                                   "result": {"files": [{"id": "f", "name": "x.docx"}]}}) if "orders/" in r.url.path
+                               else httpx.Response(200, content=b"D"))
+    bot = FakeBot()
+    oid = await place(store)
+    w = Worker(store, api, bot, 8, alert)              # log_channel berilmagan
+    w.poll_every = 0
+    await w.tick(); await w.tick()
+    assert bot.channel_docs == []
+
+
+async def test_arxiv_xato_bersa_buyurtma_baribir_yetkazilgan_deb_belgilanadi(store):
+    def handler(request):
+        if request.method == "POST":
+            return httpx.Response(202, json={"id": "ord_b", "status": "queued"})
+        if request.url.path.endswith("/orders/ord_b"):
+            return httpx.Response(200, json={"id": "ord_b", "status": "succeeded",
+                                             "result": {"files": [{"id": "fil_b", "name": "b.docx"}]}})
+        return httpx.Response(200, content=b"DOC")
+
+    api, alerts, alert = make(handler)
+
+    class FailingChannelBot(FakeBot):
+        async def send_document(self, chat_id, document, caption=None, **kw):
+            if chat_id == "-100bad":
+                raise RuntimeError("CHAT_WRITE_FORBIDDEN")
+            return await super().send_document(chat_id, document, caption)
+
+    bot = FailingChannelBot()
+    oid = await place(store)
+    w = Worker(store, api, bot, 8, alert, log_channel="-100bad")
+    w.poll_every = 0
+    await w.tick(); await w.tick()
+    assert (await store.order(oid))["delivered"] == 1
+    assert "archive_failed" in alerts

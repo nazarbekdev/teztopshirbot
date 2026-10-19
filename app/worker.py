@@ -41,12 +41,13 @@ STUCK_AFTER = 45 * 60    # shuncha vaqt "tayyorlanmoqda" bo'lsa adminga xabar
 
 
 class Worker:
-    def __init__(self, store: Store, api: PartnerClient, bot, max_active: int, alert):
+    def __init__(self, store: Store, api: PartnerClient, bot, max_active: int, alert, log_channel: str = ""):
         self.store = store
         self.api = api
         self.bot = bot
         self.max_active = max_active
         self.alert = alert                      # async (key, text) -> None
+        self.log_channel = log_channel           # shaxsiy arxiv kanali (egasi uchun) yoki bo'sh
         self._last_poll = 0.0
         self.poll_every = POLL_EVERY
 
@@ -214,6 +215,29 @@ class Worker:
             await self.alert(f"nofile:{order['id']}", f"🔴 Buyurtma #{order['id']} tayyor, lekin fayl yo'q.")
             return
         await self.store.update_order(order["id"], delivered=1, tg_files=json.dumps(tg_files))
+        await self._archive(order, spec, tg_files)
+
+    async def _archive(self, order: dict, spec, tg_files: list[str]) -> None:
+        """
+        Tayyor faylni shaxsiy arxiv kanaliga ham joylaydi (egasi uchun, ommaga yo'q — bot kanalda
+        admin bo'lishi shart). Mijozga yuborilgan `file_id` qayta ishlatiladi: qayta yuklab olish
+        shart emas. Arxiv ishlamasa (kanal sozlanmagan, bot admin emas) buyurtmaning o'zi buzilmaydi —
+        faqat ogohlantirish bilan jim o'tiladi.
+        """
+        if not self.log_channel or not tg_files:
+            return
+        user = await self.store.user(order["tg_id"])
+        caption = (f"#{order['id']} · {spec.emoji if spec else ''} {pick(spec.title, 'uz') if spec else order['service']}\n"
+                   f"👤 {(user or {}).get('name', '?')} (@{(user or {}).get('username') or '—'}) · <code>{order['tg_id']}</code>\n"
+                   f"💵 {order['price']:,} so'm".replace(",", " "))
+        try:
+            for index, file_id in enumerate(tg_files):
+                await self.bot.send_document(self.log_channel, file_id, caption=caption if index == 0 else None,
+                                             parse_mode="HTML")
+        except Exception as e:
+            logger.warning("Arxiv kanaliga yuborilmadi (#%s): %s", order["id"], e)
+            await self.alert("archive_failed", f"🟠 Arxiv kanaliga yozib bo'lmadi: <code>{html.escape(str(e))}</code>\n"
+                                                "Bot kanalda admin ekanini tekshiring.")
 
     async def _notify(self, tg_id: int, key: str, **kw) -> None:
         lang = ((await self.store.user(tg_id)) or {}).get("lang")

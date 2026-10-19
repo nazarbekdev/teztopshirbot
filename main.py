@@ -62,7 +62,7 @@ async def main() -> None:
     for module in (panel_login, start, promo, order, orders, balance, admin):
         dp.include_router(module.router)
 
-    worker = Worker(store, api, bot, settings.max_active, alert)
+    worker = Worker(store, api, bot, settings.max_active, alert, settings.orders_log_channel)
     tasks = [asyncio.create_task(worker.run())]
 
     runner = None

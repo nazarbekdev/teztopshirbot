@@ -66,6 +66,12 @@ qayta generatsiya** (`POST /v1/plans`, pul yechilmaydi) → qo'shimcha talablar 
 grafik / rasm / snoska (ha-yo'q) → hajm (20–30 / 30–40 / 40–50 bet, 55 / 65 / 75 ming). Reja ko'rsatilmasa (API xatosi),
 qadam o'tkaziladi va reja buyurtma paytida avtomatik tuziladi. Namuna DOCX orqali shablon (F8) va bepul namuna bu botda yo'q.
 
+## Buyurtmalar arxivi (shaxsiy)
+
+`ORDERS_LOG_CHANNEL` sozlansa, har bir tayyor buyurtma fayli **egasi uchun** yopiq kanalga ham joylanadi (mijozga
+yuborilgan `file_id` qayta ishlatiladi — qayta yuklab olinmaydi). Bot shu kanalda **admin** bo'lishi shart, aks holda
+arxivga yozilmaydi (buyurtmaning o'zi buzilmaydi, faqat ogohlantirish ketadi). Kanal ommaga yopiq, hech kimga ko'rinmaydi.
+
 ## Admin: chek tasdiqlash
 
 Karta to'lovi kartasida uchta tugma: **Tasdiqlash**, **Rad etish**, **Summani tahrirlash** (mijoz noto'g'ri
