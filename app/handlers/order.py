@@ -331,10 +331,16 @@ async def case_open(callback: CallbackQuery, state: FSMContext, store, api, lang
 
 def _summary(slug: str, answers: dict, lang: str, tpl: dict | None = None) -> str:
     lines = []
+    shown_keys = set()
     for step in SERVICES[slug].steps:
+        # Bir xil kalitni ikki xil shartli qadam ulashishi mumkin (masalan kurs ishida "plan" — avto va qo'lda,
+        # maqolada "pages" — uslubga qarab). Faqat HOZIR faol bo'lgan va hali ko'rsatilmagan qadam chiqadi.
+        if step.key in shown_keys or not is_active(step, answers):
+            continue
         value = answers.get(step.key)
         if step.kind == "profile" or value in (None, ""):
             continue
+        shown_keys.add(step.key)
         if step.kind == "template":
             name = templates_ui.name_of(tpl, value, answers.get("language", lang)) if tpl else value
             lines.append(f"• {html.escape(pick(step.lbl, lang))}: <b>{html.escape(name)}</b>")

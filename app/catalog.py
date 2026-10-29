@@ -82,6 +82,8 @@ def is_active(step: "Step", answers: dict) -> bool:
       plan_auto    reja avtomatik tuzilsin deb tanlangan
       plan_manual  o'z rejasini yozmoqchi
       case         «korxona ma'lumotini kiritish» tugmasi bosilgan
+      style_uni    maqola uslubi — universitet (5/7 bet)
+      style_adv    maqola uslubi — imrad yoki oak (7/10 bet, soha va foydalanuvchi ma'lumoti so'raladi)
     """
     when = step.when
     if not when:
@@ -94,6 +96,10 @@ def is_active(step: "Step", answers: dict) -> bool:
         return answers.get("plan_mode") == "manual"
     if when == "case":
         return bool(answers.get("_case"))
+    if when == "style_uni":
+        return answers.get("style", "universitet") == "universitet"
+    if when == "style_adv":
+        return answers.get("style") in ("imrad", "oak")
     raise ValueError(f"noma'lum shart: {when}")
 
 
@@ -291,6 +297,74 @@ PAGES_SIMPLE = _priced(
     _count("pages", "📄 Necha bet?", "📄 Сколько страниц?", "📄 How many pages?", ("Hajm (bet)", "Объём (стр.)", "Length (pages)"), (10, 15, 20)),
     SIMPLE_PRICES, ("bet", "стр.", "pages"))
 
+
+# ── maqola: uch uslub (universitet/IMRAD/OAK) — hamkor API bilan bir xil dvigatel ────────────
+STYLE_STEP = Step(
+    "style",
+    _d("📰 Qaysi uslubda yozilsin?", "📰 В каком стиле написать?", "📰 Which style should it be written in?"),
+    _d("Uslub", "Стиль", "Style"), kind="choice",
+    choices=(
+        ("universitet", _d("🎓 Universitet (oddiy ilmiy maqola)", "🎓 Университетский (обычная научная статья)", "🎓 University (plain academic article)")),
+        ("imrad", _d("🧪 IMRAD (sarlavhali, [1] havolali)", "🧪 IMRAD (с подзаголовками, ссылки [1])", "🧪 IMRAD (headed, [1]-style citations)")),
+        ("oak", _d("🏛 OAK (jurnal namunasi)", "🏛 ВАК (образец журнала)", "🏛 HAC (journal-style)")),
+    ),
+)
+MAQOLA_PAGES_UNI = Step(
+    "pages", _d("📄 Necha bet bo'lsin?", "📄 Сколько страниц?", "📄 How many pages?"),
+    _d("Hajm", "Объём", "Length"), kind="choice", when="style_uni", numeric=True,
+    choices=tuple((str(v), _d(f"{v} bet", f"{v} стр.", f"{v} pages")) for v in (5, 7)),
+)
+MAQOLA_PAGES_ADV = Step(
+    "pages", _d("📄 Necha bet bo'lsin?", "📄 Сколько страниц?", "📄 How many pages?"),
+    _d("Hajm", "Объём", "Length"), kind="choice", when="style_adv", numeric=True,
+    choices=tuple((str(v), _d(f"{v} bet", f"{v} стр.", f"{v} pages")) for v in (7, 10)),
+)
+# OAK ixtisosliklari — asosiy botdagi `article/oak/fields.py` bilan bir xil ro'yxat (id, nomi)
+ARTICLE_FIELDS = (
+    ("ped", _d("Pedagogika", "Педагогика", "Pedagogy")),
+    ("psy", _d("Psixologiya", "Психология", "Psychology")),
+    ("eco", _d("Iqtisodiyot", "Экономика", "Economics")),
+    ("phil_lang", _d("Filologiya (tilshunoslik)", "Филология (языкознание)", "Linguistics")),
+    ("phil_lit", _d("Filologiya (adabiyotshunoslik)", "Филология (литературоведение)", "Literary studies")),
+    ("hist", _d("Tarix", "История", "History")),
+    ("philos", _d("Falsafa", "Философия", "Philosophy")),
+    ("law", _d("Yuridik fanlar", "Юридические науки", "Law")),
+    ("soc", _d("Sotsiologiya", "Социология", "Sociology")),
+    ("pol", _d("Siyosiy fanlar", "Политические науки", "Political science")),
+    ("tech", _d("Texnika fanlari", "Технические науки", "Engineering")),
+    ("it", _d("Axborot texnologiyalari", "Информационные технологии", "Information technology")),
+    ("math", _d("Fizika-matematika", "Физико-математические науки", "Physics and mathematics")),
+    ("chem", _d("Kimyo", "Химия", "Chemistry")),
+    ("bio", _d("Biologiya", "Биология", "Biology")),
+    ("med", _d("Tibbiyot", "Медицина", "Medicine")),
+    ("agro", _d("Qishloq xo'jaligi", "Сельское хозяйство", "Agriculture")),
+    ("geo", _d("Geografiya", "География", "Geography")),
+    ("art", _d("San'atshunoslik", "Искусствоведение", "Art studies")),
+    ("sport", _d("Jismoniy tarbiya va sport", "Физическая культура и спорт", "Physical education")),
+)
+FIELD_STEP = Step(
+    "field", _d("🔬 Maqola qaysi sohaga tegishli?", "🔬 К какой области относится статья?", "🔬 Which field does the article belong to?"),
+    _d("Soha", "Область", "Field"), kind="choice", when="style_adv", choices=ARTICLE_FIELDS,
+)
+USER_DATA_STEP = Step(
+    "user_data",
+    _d("📊 <b>O'z raqam/faktlaringiz</b> bormi (statistika, tadqiqot natijasi)?\n\nBo'lsa yuboring — matn shularga tayanadi, to'qima raqam "
+       "ishlatilmaydi. Bo'lmasa — <b>⏭ O'tkazib yuborish</b>.",
+       "📊 Есть ли у вас <b>свои цифры/факты</b> (статистика, результаты исследования)?\n\nЕсли есть — пришлите, текст будет опираться на них, "
+       "а не на выдуманные цифры. Если нет — <b>⏭ Пропустить</b>.",
+       "📊 Do you have your <b>own data/facts</b> (statistics, research results)?\n\nIf so, send them — the text will rely on them instead of "
+       "invented numbers. If not — <b>⏭ Skip</b>."),
+    _d("Muallifning ma'lumoti", "Данные автора", "Author's data"), optional=True, hi=4000, when="style_adv",
+)
+MAQOLA_NOTES = Step(
+    "notes",
+    _d("📝 Qo'shimcha talablaringiz bormi? (ixtiyoriy)", "📝 Есть ли дополнительные требования? (необязательно)",
+       "📝 Any additional requirements? (optional)"),
+    _d("Qo'shimcha talablar", "Доп. требования", "Extra requirements"), optional=True, hi=1000,
+)
+MAQOLA_PRICE = 12_000
+
+
 SERVICES: dict[str, Service] = {
     "taqdimot": Service(
         "taqdimot", "📊", _d("Taqdimot", "Презентация", "Presentation"),
@@ -352,9 +426,17 @@ SERVICES: dict[str, Service] = {
                  CROSSWORD_PRICES, ("ta so'z", "слов", "words"))),
         CROSSWORD_PRICES, price_key="word_count",
     ),
+    "maqola": Service(
+        "maqola", "📰", _d("Ilmiy maqola", "Научная статья", "Academic article"),
+        _d("DOCX", "DOCX", "DOCX"),
+        _d("5–10 daqiqa", "5–10 минут", "5–10 minutes"),
+        (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, DIRECTION, SUPERVISOR, TOPIC, STYLE_STEP,
+         MAQOLA_PAGES_UNI, MAQOLA_PAGES_ADV, FIELD_STEP, USER_DATA_STEP, MAQOLA_NOTES),
+        MAQOLA_PRICE, profile=True,
+    ),
 }
 
-ORDER = ("taqdimot", "kurs_ishi", "mustaqil_ish", "referat", "test", "krossvord")
+ORDER = ("taqdimot", "kurs_ishi", "mustaqil_ish", "referat", "test", "krossvord", "maqola")
 STUDENT_KEYS = ("full_name", "university", "faculty", "kafedra", "direction", "group", "supervisor", "city")
 
 

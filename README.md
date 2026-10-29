@@ -66,6 +66,15 @@ qayta generatsiya** (`POST /v1/plans`, pul yechilmaydi) → qo'shimcha talablar 
 grafik / rasm / snoska (ha-yo'q) → hajm (20–30 / 30–40 / 40–50 bet, 55 / 65 / 75 ming). Reja ko'rsatilmasa (API xatosi),
 qadam o'tkaziladi va reja buyurtma paytida avtomatik tuziladi. Namuna DOCX orqali shablon (F8) va bepul namuna bu botda yo'q.
 
+## Maqola xizmati
+
+Uch uslub (hamkor API bilan bir xil dvigatel): **universitet** (oddiy ilmiy maqola, 5/7 bet), **IMRAD**
+(sarlavhali, [1] havolali, 7/10 bet), **OAK** (jurnal namunasi, 7/10 bet). Oqim: hujjat tili → titul ma'lumotlari
+(ixtiyoriy, saqlanadi) → mavzu → uslub → hajm (uslubga qarab) → *(IMRAD/OAK bo'lsa)* soha (OAK'ning 20 ixtisosligi) va
+muallifning o'z raqam/fakti → qo'shimcha talablar. Universitet uslubida soha va muallif ma'lumoti umuman so'ralmaydi
+va API'ga yuborilmaydi (`is_active`, `app/catalog.py`). Narx flat **12 000 so'm** (hamkor narxi 8 000). Kafolat va'da
+qilinmaydi.
+
 ## Buyurtmalar arxivi (shaxsiy)
 
 `ORDERS_LOG_CHANNEL` sozlansa, har bir tayyor buyurtma fayli **egasi uchun** yopiq kanalga ham joylanadi (mijozga

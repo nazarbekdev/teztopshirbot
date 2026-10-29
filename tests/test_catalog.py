@@ -2,7 +2,7 @@ from app.catalog import ORDER, SERVICES, build_params, money
 
 # Hamkor (OsonTopshir) narxlari — `GET /credits` dagi standart qiymatlar
 PARTNER_COST = {"kurs_ishi": 25_000, "taqdimot": 3_000, "mustaqil_ish": 4_000,
-                "referat": 4_000, "test": 1_500, "krossvord": 1_000}
+                "referat": 4_000, "test": 1_500, "krossvord": 1_000, "maqola": 8_000}
 # Hamkor narxidan kamida 10% yuqori. Egasi (ikkala bot ham uniki) 2026-10-18 da mustaqil ish/referatni
 # 4 500 ga (hamkor 4 000 → marja 12,5%) tushirdi: haqiqiy LLM tannarxi hamkor narxidan ancha past.
 MIN_MARGIN = 0.10
@@ -55,6 +55,7 @@ def test_savollar_tartibi_asosiy_bot_bilan_bir_xil():
     assert keys("mustaqil_ish") == ["language", "subject", "topic", "pages"]
     assert keys("kurs_ishi") == ["language", "subject", "topic", "plan_mode", "plan_cfg", "plan", "plan", "extra_instructions",
                                  "case_data", "has_diagrams", "has_images", "has_footnotes", "pages"]
+    assert keys("maqola") == ["language", "topic", "style", "pages", "pages", "field", "user_data", "notes"]
 
 
 def test_student_alohida_obyekt_va_bosh_maydon_tushadi():
@@ -78,7 +79,7 @@ def test_pul_formati_tilga_qarab():
 def test_boshlangich_narxlar():
     prices = {slug: SERVICES[slug].min_price for slug in ORDER}
     assert prices == {"taqdimot": 4_500, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
-                      "referat": 4_500, "test": 2_500, "krossvord": 1_500}
+                      "referat": 4_500, "test": 2_500, "krossvord": 1_500, "maqola": 12_000}
 
 
 def test_kichik_xizmatlarda_har_pogona_1000_qoshiladi():
@@ -109,6 +110,40 @@ def test_tanlov_tugmalarida_narx_korinadi_va_qiymat_son():
 def test_narx_kaliti_har_tanlov_qiymatiga_mos():
     for slug in ORDER:
         s = SERVICES[slug]
+        if not s.is_tiered:
+            continue                            # maqola narxi hajmga qaramaydi — alohida tekshiriladi
         step = next(st for st in s.steps if st.key == s.price_key)
         values = {int(v) if step.numeric else v for v, _ in step.choices}
         assert values == set(s.price), slug
+
+
+def test_maqola_uslubga_qarab_hajm_va_soha():
+    s = SERVICES["maqola"]
+    assert not s.is_tiered and s.price == 12_000
+    pages_steps = [st for st in s.steps if st.key == "pages"]
+    assert len(pages_steps) == 2
+    uni = next(st for st in pages_steps if st.when == "style_uni")
+    adv = next(st for st in pages_steps if st.when == "style_adv")
+    assert {v for v, _ in uni.choices} == {"5", "7"}
+    assert {v for v, _ in adv.choices} == {"7", "10"}
+    field = next(st for st in s.steps if st.key == "field")
+    assert field.when == "style_adv" and len(field.choices) == 20
+    assert {v for v, _ in field.choices} == {
+        "ped", "psy", "eco", "phil_lang", "phil_lit", "hist", "philos", "law", "soc", "pol",
+        "tech", "it", "math", "chem", "bio", "med", "agro", "geo", "art", "sport",
+    }
+
+
+def test_maqola_universitet_uslubida_soha_va_malumot_sorlmaydi():
+    p = build_params(SERVICES["maqola"], {"language": "uz", "topic": "Mavzu uzun yetarlicha",
+                                          "style": "universitet", "pages": "5", "field": "it",
+                                          "user_data": "bu kerak emas", "notes": ""})
+    assert p == {"language": "uz", "topic": "Mavzu uzun yetarlicha", "style": "universitet", "pages": "5"}
+
+
+def test_maqola_imrad_uslubida_soha_va_malumot_yuboriladi():
+    p = build_params(SERVICES["maqola"], {"language": "uz", "topic": "Mavzu uzun yetarlicha",
+                                          "style": "imrad", "pages": "7", "field": "it",
+                                          "user_data": "5 ta respondent", "notes": "jadval kerak"})
+    assert p == {"language": "uz", "topic": "Mavzu uzun yetarlicha", "style": "imrad", "pages": "7",
+                "field": "it", "user_data": "5 ta respondent", "notes": "jadval kerak"}

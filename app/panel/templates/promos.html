@@ -10,7 +10,7 @@
 <input name="note" placeholder="Izoh" maxlength="100">
 </div>
 <div class="row" style="margin-bottom:10px">Bepul bo'ladigan xizmatlar (bittasini tanlaydi):
-{% for sv in services %}<label><input type="checkbox" name="services" value="{{ sv.slug }}" {{ 'checked' if sv.slug != 'kurs_ishi' }}> {{ sv.title }}</label>{% endfor %}</div>
+{% for sv in services %}<label><input type="checkbox" name="services" value="{{ sv.slug }}" {{ 'checked' if sv.slug not in ('kurs_ishi', 'maqola') }}> {{ sv.title }}</label>{% endfor %}</div>
 <button class="g">Promokod yaratish</button>
 </form>
 <div class="scroll"><table>
