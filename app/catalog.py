@@ -304,9 +304,9 @@ STYLE_STEP = Step(
     _d("📰 Qaysi uslubda yozilsin?", "📰 В каком стиле написать?", "📰 Which style should it be written in?"),
     _d("Uslub", "Стиль", "Style"), kind="choice",
     choices=(
-        ("universitet", _d("🎓 Universitet (oddiy ilmiy maqola)", "🎓 Университетский (обычная научная статья)", "🎓 University (plain academic article)")),
-        ("imrad", _d("🧪 IMRAD (sarlavhali, [1] havolali)", "🧪 IMRAD (с подзаголовками, ссылки [1])", "🧪 IMRAD (headed, [1]-style citations)")),
-        ("oak", _d("🏛 OAK (jurnal namunasi)", "🏛 ВАК (образец журнала)", "🏛 HAC (journal-style)")),
+        ("universitet", _d("🎓 Universitet uchun", "🎓 Для университета", "🎓 For university")),
+        ("imrad", _d("📄 IMRAD (xalqaro uslub)", "📄 IMRAD (международный стиль)", "📄 IMRAD (international style)")),
+        ("oak", _d("🏛 OAK (jurnal, chop etish uchun)", "🏛 ВАК (журнал, для публикации)", "🏛 HAC (journal, for publication)")),
     ),
 )
 MAQOLA_PAGES_UNI = Step(
@@ -430,7 +430,7 @@ SERVICES: dict[str, Service] = {
         "maqola", "📰", _d("Ilmiy maqola", "Научная статья", "Academic article"),
         _d("DOCX", "DOCX", "DOCX"),
         _d("5–10 daqiqa", "5–10 минут", "5–10 minutes"),
-        (LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, DIRECTION, SUPERVISOR, TOPIC, STYLE_STEP,
+        (STYLE_STEP, LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, DIRECTION, SUPERVISOR, TOPIC,
          MAQOLA_PAGES_UNI, MAQOLA_PAGES_ADV, FIELD_STEP, USER_DATA_STEP, MAQOLA_NOTES),
         MAQOLA_PRICE, profile=True,
     ),

@@ -45,9 +45,12 @@ def test_tanlov_qiymatlari_hamkor_qoidalariga_mos():
 
 
 def test_savollar_tartibi_asosiy_bot_bilan_bir_xil():
-    """Hujjat tili — har doim birinchi; keyin fan, mavzu, hajm."""
+    """Hujjat tili — har doim birinchi (maqolada uslub birinchi, chunki uslub savol shaklini belgilaydi)."""
     for slug in ORDER:
-        assert SERVICES[slug].steps[0].key == "language"
+        if slug == "maqola":
+            assert SERVICES[slug].steps[0].key == "style"
+        else:
+            assert SERVICES[slug].steps[0].key == "language"
     keys = lambda slug: [s.key for s in SERVICES[slug].steps if s.kind != "profile" and s.target == "params"]
     assert keys("taqdimot") == ["language", "subject", "topic", "notes", "template", "slides", "presenter", "supervisor"]
     assert keys("test") == ["language", "subject", "topic", "questions"]
@@ -55,7 +58,7 @@ def test_savollar_tartibi_asosiy_bot_bilan_bir_xil():
     assert keys("mustaqil_ish") == ["language", "subject", "topic", "pages"]
     assert keys("kurs_ishi") == ["language", "subject", "topic", "plan_mode", "plan_cfg", "plan", "plan", "extra_instructions",
                                  "case_data", "has_diagrams", "has_images", "has_footnotes", "pages"]
-    assert keys("maqola") == ["language", "topic", "style", "pages", "pages", "field", "user_data", "notes"]
+    assert keys("maqola") == ["style", "language", "topic", "pages", "pages", "field", "user_data", "notes"]
 
 
 def test_student_alohida_obyekt_va_bosh_maydon_tushadi():

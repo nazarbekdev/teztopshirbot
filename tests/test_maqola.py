@@ -3,9 +3,11 @@ import json
 from tests.test_flow import ADMIN, CUSTOMER, env  # noqa: F401  (fixture)
 
 
-async def start_maqola(env, topic="Sun'iy intellekt ta'limda qo'llanilishi"):
+async def start_maqola(env, style="universitet", topic="Sun'iy intellekt ta'limda qo'llanilishi"):
+    """Uslub birinchi so'raladi, keyin til va titul, so'ng mavzu — keyingi qadam hajm (pages)."""
     await env.store.credit(5, 50_000, "topup")
     await env.say("📰 Ilmiy maqola")
+    await env.press(f"c:{style}")
     await env.press("c:uz")
     await env.press("skipall")                      # titul ma'lumotlari (ism/universitet/yo'nalish/rahbar)
     await env.say(topic)
@@ -15,10 +17,18 @@ async def last_order_params(env):
     return json.loads((await env.store.orders_by_status("queued"))[-1]["params"])
 
 
-async def test_universitet_uslubi_qisqa_oqim(env):
-    await start_maqola(env)
+async def test_uslub_birinchi_soraladi(env):
+    await env.store.credit(5, 50_000, "topup")
+    await env.say("📰 Ilmiy maqola")
     assert "Qaysi uslubda" in env.last() or "uslub" in env.last().lower()
-    await env.press("c:universitet")
+    button_texts = " ".join(b.text for m in env.session.calls if getattr(m, "reply_markup", None)
+                            and hasattr(m.reply_markup, "inline_keyboard")
+                            for row in m.reply_markup.inline_keyboard for b in row)
+    assert "Universitet uchun" in button_texts and "IMRAD (xalqaro uslub)" in button_texts
+
+
+async def test_universitet_uslubi_qisqa_oqim(env):
+    await start_maqola(env, "universitet")
     assert "Necha bet" in env.last() or "bet" in env.last().lower()
     await env.press("c:5")
     # universitet uslubida soha va muallif ma'lumoti so'ralmaydi — to'g'ridan-to'g'ri qo'shimcha talablar
@@ -34,8 +44,7 @@ async def test_universitet_uslubi_qisqa_oqim(env):
 
 
 async def test_imrad_uslubida_soha_va_malumot_soraladi(env):
-    await start_maqola(env)
-    await env.press("c:imrad")
+    await start_maqola(env, "imrad")
     await env.press("c:7")
     assert "soha" in env.last().lower()
     await env.press("c:it")
@@ -51,8 +60,7 @@ async def test_imrad_uslubida_soha_va_malumot_soraladi(env):
 
 
 async def test_oak_uslubida_hajm_7_yoki_10(env):
-    await start_maqola(env)
-    await env.press("c:oak")
+    await start_maqola(env, "oak")
     buttons = [b.callback_data for m in env.session.calls if getattr(m, "reply_markup", None)
                and hasattr(m.reply_markup, "inline_keyboard")
                for row in m.reply_markup.inline_keyboard for b in row if b.callback_data.startswith("c:")][-2:]
@@ -70,17 +78,18 @@ async def test_oak_uslubida_hajm_7_yoki_10(env):
 async def test_titul_malumotlari_saqlanadi_va_qayta_taklif_qilinadi(env):
     await env.store.credit(5, 50_000, "topup")
     await env.say("📰 Ilmiy maqola")
+    await env.press("c:universitet")
     await env.press("c:uz")
     await env.say("Ali Valiyev")
     await env.press("skipall")
     await env.say("Raqamli iqtisodiyot tendensiyalari")
-    await env.press("c:universitet")
     await env.press("c:5")
     await env.press("skip")
     await env.press("ok")
     assert (await env.store.profile(5)) == {"full_name": "Ali Valiyev"}
 
     await env.say("📰 Ilmiy maqola")
+    await env.press("c:universitet")
     await env.press("c:uz")
     assert "Ali Valiyev" in env.last()
     await env.press("prof:yes")
@@ -95,8 +104,7 @@ async def test_narx_va_menyuda_korinishi(env):
 async def test_promokod_maqolaga_tegishli_emas(env):
     await env.store.create_promo("TEZSTART", ["test"], None, None)
     await env.store.redeem("TEZSTART", 5)
-    await start_maqola(env)
-    await env.press("c:universitet")
+    await start_maqola(env, "universitet")
     await env.press("c:5")
     await env.press("skip")
     assert "bepul" not in env.last().lower()
