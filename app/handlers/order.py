@@ -398,10 +398,12 @@ async def on_ok(callback: CallbackQuery, state: FSMContext, store, settings, lan
         return
     if service.profile:
         await store.save_profile(uid, {k: data["answers"].get(k) for k in STUDENT_KEYS})
+    # reply_markup (ReplyKeyboardMarkup) QO'SHILMAYDI: shunday xabarni Telegram keyinchalik
+    # tahrirlashga (progress-animatsiya uchun) rad etadi — "message can't be edited". Asosiy
+    # menyu tugmalari allaqachon ko'rinib turadi (buyurtma shu menyudan boshlangan).
     msg = await callback.message.answer(
         t(lang, "order_accepted", id=result, emoji=service.emoji, title=pick(service.title, lang),
-          eta=pick(service.eta, lang)),
-        parse_mode="HTML", reply_markup=ui.main_menu(lang))
+          eta=pick(service.eta, lang)), parse_mode="HTML")
     await store.update_order(result, notify_msg_id=msg.message_id)
 
 
@@ -430,8 +432,7 @@ async def on_free(callback: CallbackQuery, state: FSMContext, store, settings, l
         await store.save_profile(uid, {k: data["answers"].get(k) for k in STUDENT_KEYS})
     msg = await callback.message.answer(
         t(lang, "order_accepted", id=result, emoji=service.emoji, title=pick(service.title, lang),
-          eta=pick(service.eta, lang)),
-        parse_mode="HTML", reply_markup=ui.main_menu(lang))
+          eta=pick(service.eta, lang)), parse_mode="HTML")
     await store.update_order(result, notify_msg_id=msg.message_id)
 
 

@@ -85,6 +85,11 @@ async def test_qabul_xabari_animatsiya_uchun_saqlanadi(env):
     oid = (await env.store.orders_by_status("queued"))[-1]["id"]
     order = await env.store.order(oid)
     assert order["notify_msg_id"]
+    # Reply-klaviatura (ReplyKeyboardMarkup) BO'LMASLIGI shart: aks holda Telegram bu xabarni
+    # keyinchalik tahrirlashga ("message can't be edited") rad etadi — animatsiya ko'rinmay qoladi.
+    from aiogram.methods import SendMessage
+    sent = next(m for m in reversed(env.session.calls) if isinstance(m, SendMessage))
+    assert sent.reply_markup is None
 
 
 async def test_narx_menyuda_dan_korinishi(env):
