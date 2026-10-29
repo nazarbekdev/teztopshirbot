@@ -58,6 +58,13 @@ Shablonlar va rasmlar hamkor API'dan (`GET /templates?subject=&topic=`, `/templa
 shablonlari birinchi turadi. Rasm Telegram'ga bir marta yuklanadi va `file_id` bazada (`tpl_files`) saqlanadi.
 API javob bermasa shablon qadami o'tkaziladi va hamkor standart shablonni qo'llaydi. «O'z joyi» qoidasi `app/details.py`.
 
+## Taqdimot Pro
+
+Zamonaviy dvigatel (`taqdimot_pro` hamkor xizmati): dizayn mavzuga qarab **avtomatik** tanlanadi — shablon tanlash
+yo'q (API'ga `template` yuborilsa `400`). Sun'iy intellekt rasmlari, grafik/jadval/formula maketlari. Faqat
+**10/15/20 slayd** (25/30 yo'q — hamkor API qabul qilmaydi). Narx pog'onali: 13 000 / 17 000 / 21 000 (hamkor
+narxi 8 000, barcha pog'onada bir xil). Jonli sinaldi: to'liq PPTX+PDF muvaffaqiyatli tayyorlandi.
+
 ## Kurs ishi oqimi
 
 Asosiy botdagi tartibda: hujjat tili (**7 til**: uz, ru, en, kz, tr, tj, kaa) → saqlangan titul ma'lumotlari yoki 8 ta titul maydoni →

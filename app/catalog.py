@@ -292,6 +292,8 @@ SIMPLE_PRICES = ladder(4_500, (10, 15, 20))            # mustaqil ish va referat
 SLIDE_PRICES = ladder(4_500, (10, 15, 20, 25, 30))
 TEST_PRICES = ladder(2_500, (10, 15, 20, 25, 30))
 CROSSWORD_PRICES = ladder(1_500, (10, 15, 20, 25, 30))
+# Taqdimot Pro: AI rasm + avtomatik dizayn, hamkor narxi (8 000) oddiy taqdimotdan yuqori — pog'ona kattaroq
+PRO_PRICES = {10: 13_000, 15: 17_000, 20: 21_000}
 
 PAGES_SIMPLE = _priced(
     _count("pages", "📄 Necha bet?", "📄 Сколько страниц?", "📄 How many pages?", ("Hajm (bet)", "Объём (стр.)", "Length (pages)"), (10, 15, 20)),
@@ -440,9 +442,30 @@ SERVICES: dict[str, Service] = {
          MAQOLA_PAGES_UNI, MAQOLA_PAGES_ADV, FIELD_STEP, USER_DATA_STEP, MAQOLA_NOTES),
         MAQOLA_PRICES, price_key="style", profile=True,
     ),
+    "taqdimot_pro": Service(
+        "taqdimot_pro", "✨", _d("Taqdimot Pro", "Презентация Pro", "Presentation Pro"),
+        _d("PPTX va PDF, AI rasm va grafiklar bilan", "PPTX и PDF, с AI-изображениями и графиками",
+           "PPTX and PDF, with AI images and charts"),
+        _d("2–5 daqiqa", "2–5 минут", "2–5 minutes"),
+        (
+            LANG_STEP, SUBJECT, TOPIC, DETAILS_STEP,
+            _priced(_count("slides", "🎞 Nechta slayd?", "🎞 Сколько слайдов?", "🎞 How many slides?",
+                          ("Slaydlar", "Слайды", "Slides"), (10, 15, 20)),
+                   PRO_PRICES, ("slayd", "слайдов", "slides")),
+            Step("presenter", _d("👤 Taqdimotchi ismini kiriting:\n\n<i>Masalan: Azizbek Alijonov</i>",
+                                 "👤 Введите имя докладчика:\n\n<i>Например: Азизбек Алижонов</i>",
+                                 "👤 Enter the presenter's name:\n\n<i>Example: Azizbek Alijonov</i>"),
+                 _d("Taqdimotchi", "Докладчик", "Presenter"), optional=True, hi=100),
+            Step("supervisor", _d("👨‍🏫 Rahbar (ustoz) ismini kiriting:\n\n<i>Masalan: Prof. Azizbek Alijonov</i>",
+                                  "👨‍🏫 Введите имя руководителя (преподавателя):\n\n<i>Например: Проф. Азизбек Алижонов</i>",
+                                  "👨‍🏫 Enter the supervisor's (teacher's) name:\n\n<i>Example: Prof. Azizbek Alijonov</i>"),
+                 _d("Rahbar", "Руководитель", "Supervisor"), optional=True, hi=100),
+        ),
+        PRO_PRICES, price_key="slides",
+    ),
 }
 
-ORDER = ("taqdimot", "kurs_ishi", "mustaqil_ish", "referat", "test", "krossvord", "maqola")
+ORDER = ("taqdimot", "taqdimot_pro", "kurs_ishi", "mustaqil_ish", "referat", "test", "krossvord", "maqola")
 STUDENT_KEYS = ("full_name", "university", "faculty", "kafedra", "direction", "group", "supervisor", "city")
 
 

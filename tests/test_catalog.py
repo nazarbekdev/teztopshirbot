@@ -1,7 +1,7 @@
 from app.catalog import ORDER, SERVICES, build_params, money
 
 # Hamkor (OsonTopshir) narxlari — `GET /credits` dagi standart qiymatlar
-PARTNER_COST = {"kurs_ishi": 25_000, "taqdimot": 3_000, "mustaqil_ish": 4_000,
+PARTNER_COST = {"kurs_ishi": 25_000, "taqdimot": 3_000, "taqdimot_pro": 8_000, "mustaqil_ish": 4_000,
                 "referat": 4_000, "test": 1_500, "krossvord": 1_000, "maqola": 8_000}
 # Hamkor narxidan kamida 10% yuqori. Egasi (ikkala bot ham uniki) 2026-10-18 da mustaqil ish/referatni
 # 4 500 ga (hamkor 4 000 → marja 12,5%) tushirdi: haqiqiy LLM tannarxi hamkor narxidan ancha past.
@@ -81,7 +81,7 @@ def test_pul_formati_tilga_qarab():
 
 def test_boshlangich_narxlar():
     prices = {slug: SERVICES[slug].min_price for slug in ORDER}
-    assert prices == {"taqdimot": 4_500, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
+    assert prices == {"taqdimot": 4_500, "taqdimot_pro": 13_000, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
                       "referat": 4_500, "test": 2_500, "krossvord": 1_500, "maqola": 9_000}
 
 
