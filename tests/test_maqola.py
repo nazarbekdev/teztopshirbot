@@ -34,13 +34,13 @@ async def test_universitet_uslubi_qisqa_oqim(env):
     # universitet uslubida soha va muallif ma'lumoti so'ralmaydi — to'g'ridan-to'g'ri qo'shimcha talablar
     assert "Qo'shimcha talab" in env.last()
     await env.press("skip")
-    assert "12 000" in env.last()
+    assert "9 000" in env.last()
     await env.press("ok")
     params = await last_order_params(env)
     assert params == {"language": "uz", "topic": "Sun'iy intellekt ta'limda qo'llanilishi",
                       "style": "universitet", "pages": 5}
-    assert (await env.store.orders_by_status("queued"))[-1]["price"] == 12_000
-    assert await env.store.balance(5) == 38_000
+    assert (await env.store.orders_by_status("queued"))[-1]["price"] == 9_000
+    assert await env.store.balance(5) == 41_000
 
 
 async def test_imrad_uslubida_soha_va_malumot_soraladi(env):
@@ -98,7 +98,7 @@ async def test_titul_malumotlari_saqlanadi_va_qayta_taklif_qilinadi(env):
 
 async def test_narx_va_menyuda_korinishi(env):
     await env.say("/start")
-    assert "12 000" in env.last() and ("Ilmiy maqola" in env.last() or "📰" in env.last())
+    assert "9 000" in env.last() and ("Ilmiy maqola" in env.last() or "📰" in env.last())
 
 
 async def test_promokod_maqolaga_tegishli_emas(env):

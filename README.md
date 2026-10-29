@@ -72,7 +72,8 @@ Uch uslub (hamkor API bilan bir xil dvigatel): **universitet** (oddiy ilmiy maqo
 (sarlavhali, [1] havolali, 7/10 bet), **OAK** (jurnal namunasi, 7/10 bet). Oqim: hujjat tili → titul ma'lumotlari
 (ixtiyoriy, saqlanadi) → mavzu → uslub → hajm (uslubga qarab) → *(IMRAD/OAK bo'lsa)* soha (OAK'ning 20 ixtisosligi) va
 muallifning o'z raqam/fakti → qo'shimcha talablar. Universitet uslubida soha va muallif ma'lumoti umuman so'ralmaydi
-va API'ga yuborilmaydi (`is_active`, `app/catalog.py`). Narx flat **12 000 so'm** (hamkor narxi 8 000). Kafolat va'da
+va API'ga yuborilmaydi (`is_active`, `app/catalog.py`). Narx **uslubga qarab qat'iy** (bet soniga qaramaydi):
+universitet 9 000, IMRAD 12 000, OAK 14 000 (hamkor narxi barcha uslubda bir xil — 8 000). Kafolat va'da
 qilinmaydi.
 
 ## Buyurtmalar arxivi (shaxsiy)

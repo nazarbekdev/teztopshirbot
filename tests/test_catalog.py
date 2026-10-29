@@ -82,7 +82,7 @@ def test_pul_formati_tilga_qarab():
 def test_boshlangich_narxlar():
     prices = {slug: SERVICES[slug].min_price for slug in ORDER}
     assert prices == {"taqdimot": 4_500, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
-                      "referat": 4_500, "test": 2_500, "krossvord": 1_500, "maqola": 12_000}
+                      "referat": 4_500, "test": 2_500, "krossvord": 1_500, "maqola": 9_000}
 
 
 def test_kichik_xizmatlarda_har_pogona_1000_qoshiladi():
@@ -122,7 +122,8 @@ def test_narx_kaliti_har_tanlov_qiymatiga_mos():
 
 def test_maqola_uslubga_qarab_hajm_va_soha():
     s = SERVICES["maqola"]
-    assert not s.is_tiered and s.price == 12_000
+    assert s.is_tiered and s.price == {"universitet": 9_000, "imrad": 12_000, "oak": 14_000}
+    assert [s.price_for({"style": v}) for v in ("universitet", "imrad", "oak")] == [9_000, 12_000, 14_000]
     pages_steps = [st for st in s.steps if st.key == "pages"]
     assert len(pages_steps) == 2
     uni = next(st for st in pages_steps if st.when == "style_uni")

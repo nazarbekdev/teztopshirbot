@@ -299,14 +299,21 @@ PAGES_SIMPLE = _priced(
 
 
 # ── maqola: uch uslub (universitet/IMRAD/OAK) — hamkor API bilan bir xil dvigatel ────────────
+# Narx uslubga qarab QAT'IY (bet soniga qaramaydi) — hamkor narxi (8 000) barcha uslubda bir xil bo'lsa ham,
+# IMRAD/OAK real manba va fakt nazoratidan o'tgani uchun mijoz narxi balandroq.
+MAQOLA_PRICES = {"universitet": 9_000, "imrad": 12_000, "oak": 14_000}
 STYLE_STEP = Step(
     "style",
     _d("📰 Qaysi uslubda yozilsin?", "📰 В каком стиле написать?", "📰 Which style should it be written in?"),
     _d("Uslub", "Стиль", "Style"), kind="choice",
-    choices=(
-        ("universitet", _d("🎓 Universitet uchun", "🎓 Для университета", "🎓 For university")),
-        ("imrad", _d("📄 IMRAD (xalqaro uslub)", "📄 IMRAD (международный стиль)", "📄 IMRAD (international style)")),
-        ("oak", _d("🏛 OAK (jurnal, chop etish uchun)", "🏛 ВАК (журнал, для публикации)", "🏛 HAC (journal, for publication)")),
+    choices=tuple(
+        (style, _d(f"{label} — {money(MAQOLA_PRICES[style], 'uz')}", f"{ru} — {money(MAQOLA_PRICES[style], 'ru')}",
+                   f"{en} — {money(MAQOLA_PRICES[style], 'en')}"))
+        for style, label, ru, en in (
+            ("universitet", "🎓 Universitet uchun", "🎓 Для университета", "🎓 For university"),
+            ("imrad", "📄 IMRAD (xalqaro uslub)", "📄 IMRAD (международный стиль)", "📄 IMRAD (international style)"),
+            ("oak", "🏛 OAK (jurnal, chop etish uchun)", "🏛 ВАК (журнал, для публикации)", "🏛 HAC (journal, for publication)"),
+        )
     ),
 )
 MAQOLA_PAGES_UNI = Step(
@@ -362,7 +369,6 @@ MAQOLA_NOTES = Step(
        "📝 Any additional requirements? (optional)"),
     _d("Qo'shimcha talablar", "Доп. требования", "Extra requirements"), optional=True, hi=1000,
 )
-MAQOLA_PRICE = 12_000
 
 
 SERVICES: dict[str, Service] = {
@@ -432,7 +438,7 @@ SERVICES: dict[str, Service] = {
         _d("5–10 daqiqa", "5–10 минут", "5–10 minutes"),
         (STYLE_STEP, LANG_STEP, PROFILE_STEP, FULL_NAME, UNIVERSITY, DIRECTION, SUPERVISOR, TOPIC,
          MAQOLA_PAGES_UNI, MAQOLA_PAGES_ADV, FIELD_STEP, USER_DATA_STEP, MAQOLA_NOTES),
-        MAQOLA_PRICE, profile=True,
+        MAQOLA_PRICES, price_key="style", profile=True,
     ),
 }
 
