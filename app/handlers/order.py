@@ -398,10 +398,11 @@ async def on_ok(callback: CallbackQuery, state: FSMContext, store, settings, lan
         return
     if service.profile:
         await store.save_profile(uid, {k: data["answers"].get(k) for k in STUDENT_KEYS})
-    await callback.message.answer(
+    msg = await callback.message.answer(
         t(lang, "order_accepted", id=result, emoji=service.emoji, title=pick(service.title, lang),
           eta=pick(service.eta, lang)),
         parse_mode="HTML", reply_markup=ui.main_menu(lang))
+    await store.update_order(result, notify_msg_id=msg.message_id)
 
 
 @router.callback_query(Flow.confirming, F.data == "free")
@@ -427,10 +428,11 @@ async def on_free(callback: CallbackQuery, state: FSMContext, store, settings, l
         return
     if service.profile:
         await store.save_profile(uid, {k: data["answers"].get(k) for k in STUDENT_KEYS})
-    await callback.message.answer(
+    msg = await callback.message.answer(
         t(lang, "order_accepted", id=result, emoji=service.emoji, title=pick(service.title, lang),
           eta=pick(service.eta, lang)),
         parse_mode="HTML", reply_markup=ui.main_menu(lang))
+    await store.update_order(result, notify_msg_id=msg.message_id)
 
 
 @router.callback_query(F.data == "cancel")

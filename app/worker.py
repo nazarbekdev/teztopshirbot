@@ -29,13 +29,14 @@ import time
 from aiogram.types import BufferedInputFile
 
 from .api import PartnerClient, PartnerError
-from .catalog import SERVICES, pick
+from .catalog import SERVICES, pick, progress_text
 from .db import Store, now
 from .i18n import t
 
 logger = logging.getLogger(__name__)
 
 POLL_EVERY = 10          # soniya: hamkor tavsiyasi 10 dan kam bo'lmasin
+ANIMATE_EVERY = 7        # soniya: "tayyorlanmoqda" xabarini tahrirlash oralig'i (spinner har safar almashsin — toq son)
 GIVE_UP_AFTER = 30 * 60  # hamkorga yuborib bo'lmasa (5xx/tarmoq) shuncha vaqtdan so'ng pul qaytariladi
 STUCK_AFTER = 45 * 60    # shuncha vaqt "tayyorlanmoqda" bo'lsa adminga xabar
 
@@ -49,6 +50,7 @@ class Worker:
         self.alert = alert                      # async (key, text) -> None
         self.log_channel = log_channel           # shaxsiy arxiv kanali (egasi uchun) yoki bo'sh
         self._last_poll = 0.0
+        self._last_animate = 0.0
         self.poll_every = POLL_EVERY
 
     # ── aylanish ─────────────────────────────────────────────────────────
@@ -65,7 +67,40 @@ class Worker:
     async def tick(self) -> None:
         await self.submit_queued()
         await self.poll_active()
+        await self.animate_active()
         await self.deliver_pending()
+
+    # ── "tayyorlanmoqda" xabarining jonlanishi ──────────────────────────────
+    async def animate_active(self) -> None:
+        """Hali tugamagan buyurtmalarning qabul xabarini spinner + bosqich bilan tahrirlab boradi
+        (faqat `on_ok`/`on_free` saqlagan `notify_msg_id` bor buyurtmalar uchun). Tahrirlash xatosi
+        (xabar o'chirilgan, "not modified" va h.k.) jim o'tkaziladi — bu sof kosmetik animatsiya."""
+        if time.monotonic() - self._last_animate < ANIMATE_EVERY:
+            return
+        self._last_animate = time.monotonic()
+        for order in await self.store.orders_by_status("queued", "submitted", "processing"):
+            if not order["notify_msg_id"]:
+                continue
+            lang = ((await self.store.user(order["tg_id"])) or {}).get("lang")
+            try:
+                await self.bot.edit_message_text(
+                    progress_text(order, lang), chat_id=order["tg_id"], message_id=order["notify_msg_id"],
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+
+    async def _finish_progress(self, order: dict) -> None:
+        if not order["notify_msg_id"]:
+            return
+        lang = ((await self.store.user(order["tg_id"])) or {}).get("lang")
+        try:
+            await self.bot.edit_message_text(
+                t(lang, "progress_done"), chat_id=order["tg_id"], message_id=order["notify_msg_id"],
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
 
     # ── yuborish ─────────────────────────────────────────────────────────
     async def submit_queued(self) -> None:
@@ -166,6 +201,7 @@ class Worker:
         oid = order["id"]
         if status == "succeeded":
             await self.store.update_order(oid, status="succeeded")
+            await self._finish_progress(order)
             await self._deliver(order, remote)
         elif status in ("failed", "canceled"):
             code = (remote.get("error") or {}).get("code") or status

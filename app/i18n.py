@@ -393,6 +393,11 @@ TEXTS: dict[str, dict[str, str]] = {
     "st_failed": {"uz": "❌ Xato (pul qaytarilgan)", "ru": "❌ Ошибка (деньги возвращены)", "en": "❌ Failed (refunded)"},
     "st_canceled": {"uz": "🚫 Bekor qilingan", "ru": "🚫 Отменён", "en": "🚫 Cancelled"},
     # ── ishchi xabarlari ─────────────────────────────────────────────────
+    "progress_done": {
+        "uz": "✅ <b>Tayyor!</b> Fayl yuborilmoqda...",
+        "ru": "✅ <b>Готово!</b> Отправляю файл...",
+        "en": "✅ <b>Ready!</b> Sending the file...",
+    },
     "delivered": {
         "uz": "✅ <b>{title}</b> tayyor! (buyurtma #{id})",
         "ru": "✅ <b>{title}</b> готов! (заказ #{id})",

@@ -76,6 +76,17 @@ async def test_promokodga_tegishli_emas(env):
     assert "bepul" not in env.last().lower()
 
 
+async def test_qabul_xabari_animatsiya_uchun_saqlanadi(env):
+    await start_pro(env)
+    await env.press("c:10")
+    await env.press("skip")
+    await env.press("skip")
+    await env.press("ok")
+    oid = (await env.store.orders_by_status("queued"))[-1]["id"]
+    order = await env.store.order(oid)
+    assert order["notify_msg_id"]
+
+
 async def test_narx_menyuda_dan_korinishi(env):
     await env.say("/start")
     assert "9 000" in env.last() and "Taqdimot Pro" in env.last()

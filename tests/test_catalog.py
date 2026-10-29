@@ -1,4 +1,4 @@
-from app.catalog import ORDER, SERVICES, build_params, money
+from app.catalog import ORDER, SERVICES, build_params, money, progress_text
 
 # Hamkor (OsonTopshir) narxlari — `GET /credits` dagi standart qiymatlar
 PARTNER_COST = {"kurs_ishi": 25_000, "taqdimot": 3_000, "taqdimot_pro": 8_000, "mustaqil_ish": 4_000,
@@ -143,6 +143,28 @@ def test_maqola_universitet_uslubida_soha_va_malumot_sorlmaydi():
                                           "style": "universitet", "pages": "5", "field": "it",
                                           "user_data": "bu kerak emas", "notes": ""})
     assert p == {"language": "uz", "topic": "Mavzu uzun yetarlicha", "style": "universitet", "pages": "5"}
+
+
+def test_progress_text_navbatda_va_bosqichma_bosqich_ilgarilaydi():
+    import time
+
+    queued = {"service": "taqdimot_pro", "status": "queued", "created_at": int(time.time())}
+    text = progress_text(queued, "uz")
+    assert "Navbatda" in text and "░░░░░" in text          # 5 bosqich, hali boshlanmagan
+
+    processing = {"service": "taqdimot_pro", "status": "processing", "created_at": int(time.time())}
+    text2 = progress_text(processing, "uz")
+    assert "▓" in text2 and "Navbatda" not in text2
+
+    far_in_future = {"service": "taqdimot_pro", "status": "processing", "created_at": int(time.time()) - 10_000}
+    text3 = progress_text(far_in_future, "ru")
+    assert "▓▓▓▓▓" in text3                                # vaqt o'tib ketgan — oxirgi bosqichda to'xtaydi
+
+
+def test_progress_text_notanish_xizmatda_standart_bosqichlar():
+    order = {"service": "noma'lum_xizmat", "status": "processing", "created_at": int(__import__("time").time())}
+    text = progress_text(order, "uz")
+    assert "░" in text or "▓" in text
 
 
 def test_maqola_imrad_uslubida_soha_va_malumot_yuboriladi():

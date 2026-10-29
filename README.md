@@ -83,6 +83,16 @@ va API'ga yuborilmaydi (`is_active`, `app/catalog.py`). Narx **uslubga qarab qat
 universitet 9 000, IMRAD 12 000, OAK 14 000 (hamkor narxi barcha uslubda bir xil — 8 000). Kafolat va'da
 qilinmaydi.
 
+## Tayyorlanish animatsiyasi
+
+Buyurtma qabul qilingach yuborilgan "✅ Buyurtma qabul qilindi" xabari worker tomonidan ~7 soniyada bir
+tahrirlanib boradi: spinner (⏳/⌛) + joriy bosqich nomi + progress-bar (`app/catalog.py::progress_text`).
+Hamkor API alohida bosqich qaytarmaydi, shu uchun bosqichlar o'tgan vaqtga qarab taxminan ilgarilaydi
+(`PROGRESS_STAGES`/`ANIMATE_SECONDS`, xizmatga mos — taqdimot_pro'da "AI rasm va dizayn solinmoqda" kabi)
+va eng oxirgisida to'xtab turadi. Buyurtma haqiqatan tayyor bo'lganda (`status=succeeded`) xabar "✅ Tayyor!"
+ga almashtiriladi, so'ng fayl alohida xabar bilan yuboriladi. Xabar ID'si `orders.notify_msg_id` da saqlanadi;
+tahrirlash xatosi (xabar o'chirilgan va h.k.) jim o'tkaziladi — bu sof kosmetik, buyurtmaning o'ziga ta'sir qilmaydi.
+
 ## Buyurtmalar arxivi (shaxsiy)
 
 `ORDERS_LOG_CHANNEL` sozlansa, har bir tayyor buyurtma fayli **egasi uchun** yopiq kanalga ham joylanadi (mijozga

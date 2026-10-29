@@ -12,9 +12,13 @@ class FakeBot:
     def __init__(self):
         self.messages, self.documents = [], []
         self.channel_docs, self.channel_captions = [], []
+        self.edits = []
 
     async def send_message(self, chat_id, text, **kw):
         self.messages.append((chat_id, text))
+
+    async def edit_message_text(self, text, chat_id=None, message_id=None, **kw):
+        self.edits.append((chat_id, message_id, text))
 
     async def send_document(self, chat_id, document, caption=None, **kw):
         if isinstance(document, str):                  # kanalga file_id qayta ishlatilgan holat
@@ -67,6 +71,39 @@ async def test_muvaffaqiyatli_oqim(store):
     assert order["status"] == "succeeded" and order["delivered"] == 1
     assert bot.documents[0][:2] == (1, "t.pptx") and "sun'iy intellekt" in bot.documents[0][2]
     assert await store.balance(1) == 15_500 and alerts == []
+
+
+async def test_tayyorlanmoqda_xabari_animatsiya_bilan_tahrirlanadi_va_tayyorda_yakunlanadi(store):
+    state = {"done": False}
+
+    def handler(request: httpx.Request):
+        if request.method == "POST":
+            return httpx.Response(202, json={"id": "ord_p", "status": "queued"})
+        if request.url.path.endswith("/orders") and request.method == "GET":
+            if state["done"]:
+                return httpx.Response(200, json={"data": [{"id": "ord_p", "status": "succeeded",
+                                                            "result": {"files": [{"id": "fil_1", "name": "t.pptx"}]}}]})
+            return httpx.Response(200, json={"data": [{"id": "ord_p", "status": "processing"}]})
+        return httpx.Response(200, content=b"PPTXDATA")
+
+    api, alerts, alert = make(handler)
+    bot = FakeBot()
+    oid = await place(store, service="taqdimot_pro")
+    await store.update_order(oid, notify_msg_id=777)
+    w = Worker(store, api, bot, 8, alert)
+    w.poll_every = 0
+
+    await w.tick()
+    order = await store.order(oid)
+    assert order["status"] == "processing"
+    assert any(mid == 777 for _, mid, _ in bot.edits)             # animatsiya xabarini tahrirlagan
+    assert all("Tayyor" not in text for _, _, text in bot.edits)  # hali tugamagan
+
+    state["done"] = True
+    await w.tick()
+    order = await store.order(oid)
+    assert order["status"] == "succeeded" and order["delivered"] == 1
+    assert any(mid == 777 and "Tayyor" in text for _, mid, text in bot.edits)
 
 
 async def test_kredit_tugasa_pul_qaytadi_va_admin_ogohlantiriladi(store):

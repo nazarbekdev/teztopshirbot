@@ -18,6 +18,7 @@ Parametr qiymatlari hamkor API qoidalariga mos (`partner-docs`):
   krossvord   word_count 10..30
 """
 
+import time
 from dataclasses import dataclass
 
 from .details import needs_details
@@ -503,3 +504,63 @@ def build_params(service: Service, answers: dict) -> dict:
     if service.slug == "krossvord":
         params.pop("subject", None)
     return params
+
+
+# ── "tayyorlanmoqda" xabarining animatsiyasi ──────────────────────────────
+# Hamkor API alohida bosqich qaytarmaydi (faqat queued/submitted/processing), shuning uchun
+# bosqichlar o'tgan vaqtga qarab taxminan ilgarilaydi va oxirgisida to'xtab turadi — buyurtma
+# haqiqatan tayyor bo'lganda worker xabarni "✅ Tayyor!" ga almashtiradi.
+SPINNER = ("⏳", "⌛")
+
+PROGRESS_STAGES: dict[str, tuple[dict, ...]] = {
+    "taqdimot_pro": (
+        _d("📝 Mavzu tahlil qilinmoqda", "📝 Анализирую тему", "📝 Analyzing the topic"),
+        _d("🧩 Tuzilma (struktura) shakllantirilmoqda", "🧩 Формирую структуру", "🧩 Building the structure"),
+        _d("🖋 Slaydlar matni yozilmoqda", "🖋 Пишу текст слайдов", "🖋 Writing the slide text"),
+        _d("🎨 AI rasmlar va dizayn solinmoqda", "🎨 Добавляю AI-изображения и дизайн", "🎨 Adding AI images and design"),
+        _d("✨ Yakuniy sozlash", "✨ Финальная доводка", "✨ Final touches"),
+    ),
+    "taqdimot": (
+        _d("📝 Mavzu tahlil qilinmoqda", "📝 Анализирую тему", "📝 Analyzing the topic"),
+        _d("🧩 Tuzilma (struktura) shakllantirilmoqda", "🧩 Формирую структуру", "🧩 Building the structure"),
+        _d("🖋 Slaydlar matni yozilmoqda", "🖋 Пишу текст слайдов", "🖋 Writing the slide text"),
+        _d("🎨 Dizayn solinmoqda", "🎨 Применяю дизайн", "🎨 Applying the design"),
+    ),
+    "maqola": (
+        _d("📚 Manbalar tahlil qilinmoqda", "📚 Анализирую источники", "📚 Analyzing sources"),
+        _d("🧩 Maqola tuzilmasi shakllantirilmoqda", "🧩 Формирую структуру статьи", "🧩 Building the article structure"),
+        _d("🖋 Matn yozilmoqda", "🖋 Пишу текст", "🖋 Writing the text"),
+        _d("🔎 Uslub va formatga moslanmoqda", "🔎 Привожу к стилю и формату", "🔎 Matching style and format"),
+    ),
+    "kurs_ishi": (
+        _d("📋 Reja shakllantirilmoqda", "📋 Формирую план", "📋 Building the plan"),
+        _d("📝 Boblar yozilmoqda", "📝 Пишу главы", "📝 Writing the chapters"),
+        _d("📊 Jadval va ilovalar tayyorlanmoqda", "📊 Готовлю таблицы и приложения", "📊 Preparing tables and appendices"),
+        _d("🔎 Yakuniy tekshiruv", "🔎 Финальная проверка", "🔎 Final check"),
+    ),
+}
+DEFAULT_STAGES = (
+    _d("📝 So'rov qabul qilindi", "📝 Запрос принят", "📝 Request received"),
+    _d("🧠 Mazmun tayyorlanmoqda", "🧠 Готовлю содержание", "🧠 Preparing the content"),
+    _d("🛠 Hujjat yig'ilmoqda", "🛠 Собираю документ", "🛠 Assembling the document"),
+    _d("🔎 Yakuniy tekshiruv", "🔎 Финальная проверка", "🔎 Final check"),
+)
+ANIMATE_SECONDS = {"taqdimot_pro": 150, "taqdimot": 70, "kurs_ishi": 260, "maqola": 150}
+DEFAULT_ANIMATE_SECONDS = 100
+QUEUED_LABEL = _d("⏳ Navbatda turibsiz...", "⏳ Вы в очереди...", "⏳ You're in the queue...")
+
+
+def progress_text(order: dict, lang: str) -> str:
+    """Buyurtma #{id} uchun animatsiyali "tayyorlanmoqda" matni: spinner + bosqich + progress-bar."""
+    slug = order["service"]
+    stages = PROGRESS_STAGES.get(slug, DEFAULT_STAGES)
+    if order["status"] == "queued":
+        idx = -1
+    else:
+        total = ANIMATE_SECONDS.get(slug, DEFAULT_ANIMATE_SECONDS)
+        elapsed = max(0, time.time() - order["created_at"])
+        idx = min(int(elapsed / (total / len(stages))), len(stages) - 1)
+    spinner = SPINNER[int(time.time()) % len(SPINNER)]
+    bars = ("▓" * (idx + 1) + "░" * (len(stages) - idx - 1)) if idx >= 0 else "░" * len(stages)
+    stage = pick(QUEUED_LABEL if idx < 0 else stages[idx], lang)
+    return f"{spinner} <b>{stage}</b>\n{bars}"

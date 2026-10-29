@@ -131,6 +131,7 @@ class Store:
         ("users", "profile", "TEXT"),
         ("orders", "tg_files", "TEXT"),
         ("orders", "voucher_id", "INTEGER"),
+        ("orders", "notify_msg_id", "INTEGER"),
         ("payments", "original_amount", "INTEGER"),
     )
 
