@@ -293,7 +293,7 @@ SLIDE_PRICES = ladder(4_500, (10, 15, 20, 25, 30))
 TEST_PRICES = ladder(2_500, (10, 15, 20, 25, 30))
 CROSSWORD_PRICES = ladder(1_500, (10, 15, 20, 25, 30))
 # Taqdimot Pro: AI rasm + avtomatik dizayn, hamkor narxi (8 000) oddiy taqdimotdan yuqori — pog'ona kattaroq
-PRO_PRICES = {10: 13_000, 15: 17_000, 20: 21_000}
+PRO_PRICES = {10: 9_000, 15: 11_000, 20: 13_000}
 
 PAGES_SIMPLE = _priced(
     _count("pages", "📄 Necha bet?", "📄 Сколько страниц?", "📄 How many pages?", ("Hajm (bet)", "Объём (стр.)", "Length (pages)"), (10, 15, 20)),

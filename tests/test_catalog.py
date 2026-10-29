@@ -81,7 +81,7 @@ def test_pul_formati_tilga_qarab():
 
 def test_boshlangich_narxlar():
     prices = {slug: SERVICES[slug].min_price for slug in ORDER}
-    assert prices == {"taqdimot": 4_500, "taqdimot_pro": 13_000, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
+    assert prices == {"taqdimot": 4_500, "taqdimot_pro": 9_000, "kurs_ishi": 55_000, "mustaqil_ish": 4_500,
                       "referat": 4_500, "test": 2_500, "krossvord": 1_500, "maqola": 9_000}
 
 

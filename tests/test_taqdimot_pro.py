@@ -18,7 +18,7 @@ async def last_order_params(env):
 
 async def test_narxlar_pogonalari_va_tanlovda_korinishi(env):
     s = SERVICES["taqdimot_pro"]
-    assert s.is_tiered and s.price == {10: 13_000, 15: 17_000, 20: 21_000}
+    assert s.is_tiered and s.price == {10: 9_000, 15: 11_000, 20: 13_000}
     step = next(st for st in s.steps if st.key == "slides")
     assert {int(v) for v, _ in step.choices} == {10, 15, 20}      # 25/30 yo'q — hamkor API qabul qilmaydi
 
@@ -29,14 +29,14 @@ async def test_toliq_oqim_shablon_sorlmaydi(env):
     await env.press("c:15")
     await env.press("skip")
     await env.press("skip")
-    assert "17 000" in env.last()
+    assert "11 000" in env.last()
     await env.press("ok")
     params = await last_order_params(env)
     assert params == {"language": "uz", "subject": "Iqtisodiyot",
                       "topic": "Qayta tiklanuvchi energiya manbalari", "slides": 15}
     assert "template" not in params
-    assert (await env.store.orders_by_status("queued"))[-1]["price"] == 17_000
-    assert await env.store.balance(5) == 33_000
+    assert (await env.store.orders_by_status("queued"))[-1]["price"] == 11_000
+    assert await env.store.balance(5) == 39_000
 
 
 async def test_taqdimotchi_va_rahbar_toldiriladi(env):
@@ -47,7 +47,7 @@ async def test_taqdimotchi_va_rahbar_toldiriladi(env):
     await env.press("ok")
     params = await last_order_params(env)
     assert params["presenter"] == "Aliyev Vali" and params["supervisor"] == "Prof. Karimov S."
-    assert params["slides"] == 10 and (await env.store.orders_by_status("queued"))[-1]["price"] == 13_000
+    assert params["slides"] == 10 and (await env.store.orders_by_status("queued"))[-1]["price"] == 9_000
 
 
 async def test_shaxsiy_mavzuda_tafsilot_soraladi(env):
@@ -78,4 +78,4 @@ async def test_promokodga_tegishli_emas(env):
 
 async def test_narx_menyuda_dan_korinishi(env):
     await env.say("/start")
-    assert "13 000" in env.last() and "Taqdimot Pro" in env.last()
+    assert "9 000" in env.last() and "Taqdimot Pro" in env.last()

@@ -62,7 +62,7 @@ API javob bermasa shablon qadami o'tkaziladi va hamkor standart shablonni qo'lla
 
 Zamonaviy dvigatel (`taqdimot_pro` hamkor xizmati): dizayn mavzuga qarab **avtomatik** tanlanadi — shablon tanlash
 yo'q (API'ga `template` yuborilsa `400`). Sun'iy intellekt rasmlari, grafik/jadval/formula maketlari. Faqat
-**10/15/20 slayd** (25/30 yo'q — hamkor API qabul qilmaydi). Narx pog'onali: 13 000 / 17 000 / 21 000 (hamkor
+**10/15/20 slayd** (25/30 yo'q — hamkor API qabul qilmaydi). Narx pog'onali: 9 000 / 11 000 / 13 000 (hamkor
 narxi 8 000, barcha pog'onada bir xil). Jonli sinaldi: to'liq PPTX+PDF muvaffaqiyatli tayyorlandi.
 
 ## Kurs ishi oqimi
