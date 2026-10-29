@@ -64,6 +64,30 @@ async def test_bepul_buyurtma_faol_buyurtma_chegarasini_hurmat_qiladi(store):
     assert (await store.active_voucher(1)) is not None                                 # kupon sarflanmadi
 
 
+async def test_demo_bypass_shu_akkaunt_kodni_qayta_qayta_kirita_oladi(store):
+    """VAQTINCHALIK (`Store.PROMO_DEMO_BYPASS`): reklama videosi uchun — bitta akkaunt, bitta
+    kod cheklovsiz qayta-qayta ishlatiladi, lekin haqiqiy ishlatilganlar soni (`max_uses`) buzilmaydi."""
+    demo_id = next(iter(store.PROMO_DEMO_BYPASS))
+    code = store.PROMO_DEMO_BYPASS[demo_id]
+    await store.touch_user(demo_id, "Demo", None)
+    await store.create_promo(code, ALL5, max_uses=300, expires_at=None)
+
+    status, voucher = await store.redeem(code, demo_id)
+    assert status == "ok"
+    oid = await store.place_free_order(demo_id, "referat", {"topic": "x"}, voucher["id"])
+    assert isinstance(oid, int)
+    assert await store.active_voucher(demo_id) is None             # kupon sarflandi ("used")
+
+    status2, voucher2 = await store.redeem(code, demo_id)           # oddiy foydalanuvchida "used" bo'lardi
+    assert status2 == "ok" and voucher2["id"] == voucher["id"]
+    assert (await store.active_voucher(demo_id))["id"] == voucher["id"]
+    assert (await store._one("SELECT COUNT(*) AS n FROM vouchers WHERE code=?", (code,)))["n"] == 1
+
+    other_status, _ = await store.redeem(code, 999)                  # boshqa foydalanuvchiga ta'sir qilmaydi
+    assert other_status == "ok"
+    assert (await store.redeem(code, 999))[0] == "used"
+
+
 # ── Bot oqimi ────────────────────────────────────────────────────────────
 
 async def test_promokod_tunneli_va_bepul_buyurtma(env):

@@ -288,6 +288,11 @@ class Store:
             "(SELECT COUNT(*) FROM vouchers v WHERE v.code=p.code AND v.status='used') AS spent "
             "FROM promo_codes p ORDER BY created_at DESC")
 
+    # VAQTINCHALIK: reklama videosi uchun bitta akkaunt bitta kodni istagancha marta qayta
+    # kirita olsin (odatdagi "bir marta" chegarasi chetlab o'tiladi). Video tayyor bo'lgach
+    # bu yozuv olib tashlanadi va holat avvalgidek qaytadi.
+    PROMO_DEMO_BYPASS: dict[int, str] = {5605407368: "TEZSTART"}  # Nazarbek Kabulov (@mr_uzdev)
+
     async def redeem(self, code: str, tg_id: int) -> tuple[str, dict | None]:
         """
         Promokodni kiritadi. Natija: ("ok", kupon) yoki xato kodi:
@@ -299,18 +304,28 @@ class Store:
             return "invalid", None
         if promo["expires_at"] and promo["expires_at"] < now():
             return "expired", None
-        if await self._one("SELECT 1 FROM vouchers WHERE code=? AND tg_id=?", (code, tg_id)):
-            return "used", None
-        if await self._one("SELECT 1 FROM vouchers WHERE tg_id=? AND status='active'", (tg_id,)):
-            return "has_active", None
-        if promo["max_uses"] is not None:
-            taken = (await self._one("SELECT COUNT(*) AS n FROM vouchers WHERE code=?", (code,)))["n"]
-            if taken >= promo["max_uses"]:
-                return "limit", None
-        cur = await self.db.execute(
-            "INSERT INTO vouchers(tg_id, code, status, created_at) VALUES(?,?, 'active', ?)", (tg_id, code, now()))
-        voucher_id = cur.lastrowid
-        await cur.close()
+        demo = self.PROMO_DEMO_BYPASS.get(tg_id) == code
+        if not demo:
+            if await self._one("SELECT 1 FROM vouchers WHERE code=? AND tg_id=?", (code, tg_id)):
+                return "used", None
+            if await self._one("SELECT 1 FROM vouchers WHERE tg_id=? AND status='active'", (tg_id,)):
+                return "has_active", None
+            if promo["max_uses"] is not None:
+                taken = (await self._one("SELECT COUNT(*) AS n FROM vouchers WHERE code=?", (code,)))["n"]
+                if taken >= promo["max_uses"]:
+                    return "limit", None
+            cur = await self.db.execute(
+                "INSERT INTO vouchers(tg_id, code, status, created_at) VALUES(?,?, 'active', ?)", (tg_id, code, now()))
+            voucher_id = cur.lastrowid
+            await cur.close()
+        else:
+            # Shu kod+foydalanuvchi uchun bor yozuv qayta "active" ga qaytariladi (yangisi qo'shilmaydi —
+            # haqiqiy ishlatilganlar sonini (`max_uses`) buzmaydi).
+            await self.db.execute(
+                "INSERT INTO vouchers(tg_id, code, status, created_at) VALUES(?,?,'active',?) "
+                "ON CONFLICT(code, tg_id) DO UPDATE SET status='active', order_id=NULL, used_at=NULL, created_at=excluded.created_at",
+                (tg_id, code, now()))
+            voucher_id = (await self._one("SELECT id FROM vouchers WHERE code=? AND tg_id=?", (code, tg_id)))["id"]
         await self.db.commit()
         return "ok", {"id": voucher_id, "services": json.loads(promo["services"]), "code": code}
 
